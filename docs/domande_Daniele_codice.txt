@@ -1,0 +1,2 @@
+1 - Come fa il codice a trovare i dati di train e test se sono specificati in una cartella che non si chiama "data" come specificato nel codice?
+
