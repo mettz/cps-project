@@ -11,15 +11,15 @@ from cnn import CNN
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 train_data = datasets.MNIST(
-    root="data",
+    root="data", 
     train=True,
     transform=ToTensor(),
     download=True,
 )
 test_data = datasets.MNIST(root="data", train=False, transform=ToTensor())
 
-print(train_data)
-print(test_data)
+print("Train data: ", train_data)
+print("Test data:", test_data)
 print(train_data.data.size())
 print(train_data.targets.size())
 
