@@ -1,2 +1,2 @@
-1 - Come fa il codice a trovare i dati di train e test se sono specificati in una cartella che non si chiama "data" come specificato nel codice?
+1 - Come fa il codice a trovare i dati di train e test se sono specificati in una cartella che non si chiama "data" come specificato nel codice? Risposta: vengono scaricati automaticamente da torchvision quando lanci il codice la prima volta e poi cachati nella cartella data
 
