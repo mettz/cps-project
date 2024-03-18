@@ -17,3 +17,7 @@ Links:
 Books:
 - Deep Reinforcement Learning Hands-On: Apply Modern RL Methods, Maxim Lapan
 - Foundations of Deep Reinforcement Learning: Theory and Practice in Python
+
+### Usefull repos
+- [Example quadrotor and obstacles](https://github.com/ntnu-arl/aerial_gym_simulator) 
+
