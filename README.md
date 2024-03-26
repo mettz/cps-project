@@ -19,5 +19,9 @@ Books:
 - Foundations of Deep Reinforcement Learning: Theory and Practice in Python
 
 ### Usefull repos
-- [Example quadrotor and obstacles](https://github.com/ntnu-arl/aerial_gym_simulator) 
+- [Example quadrotor and obstacles](https://github.com/ntnu-arl/cps_project_simulator) 
+
+### To run the env
+
+python3 example.py # or python3 example.py --task="quad_with_obstacles"
 
