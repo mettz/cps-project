@@ -4,10 +4,9 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import pytorch3d.transforms as p3d_transforms
 import torch
-
-from cps_project.utils.math import *
+import pytorch3d.transforms as p3d_transforms
+from aerial_gym.utils.math import * 
 
 
 class LeePositionController:
@@ -27,12 +26,10 @@ class LeePositionController:
         # perform calculation for transformation matrices
 
         rotation_matrices = p3d_transforms.quaternion_to_matrix(
-            robot_state[:, [6, 3, 4, 5]]
-        )
+            robot_state[:, [6, 3, 4, 5]])
         rotation_matrix_transpose = torch.transpose(rotation_matrices, 1, 2)
-        euler_angles = p3d_transforms.matrix_to_euler_angles(rotation_matrices, "ZYX")[
-            :, [2, 1, 0]
-        ]
+        euler_angles = p3d_transforms.matrix_to_euler_angles(
+            rotation_matrices, "ZYX")[:, [2, 1, 0]]
 
         vehicle_position = robot_state[:, 0:3]
 
@@ -40,9 +37,7 @@ class LeePositionController:
 
         # Compute desired accelerations
         pos_error = desired_vehicle_position - vehicle_position
-        accel_command = (
-            self.K_pos_tensor * pos_error - self.K_vel_tensor * robot_state[:, 7:10]
-        )
+        accel_command = self.K_pos_tensor * pos_error - self.K_vel_tensor*robot_state[:, 7:10]
         accel_command[:, 2] += 1
 
         forces_command = accel_command
@@ -50,6 +45,7 @@ class LeePositionController:
 
         # # print(accel_command.shape, torch.norm(accel_command, dim=1).shape)
         b3_c = torch.div(accel_command, torch.norm(accel_command, dim=1).unsqueeze(1))
+
 
         temp_dir = torch.zeros_like(euler_angles)
         temp_dir[:, 0] = torch.cos(euler_angles[:, 2])
@@ -59,7 +55,8 @@ class LeePositionController:
 
         b2_c = torch.cross(b3_c, temp_dir, dim=1)
         b2_c = torch.div(b2_c, torch.norm(b2_c, dim=1).unsqueeze(1))
-
+        
+        
         b1_c = torch.cross(b2_c, b3_c)
         rotation_matrix_desired = torch.zeros_like(rotation_matrices)
         rotation_matrix_desired[:, :, 0] = b1_c
@@ -68,11 +65,9 @@ class LeePositionController:
 
         ## Stuff that works below here
         rotation_matrix_desired_transpose = torch.transpose(
-            rotation_matrix_desired, 1, 2
-        )
-        rot_err_mat = torch.bmm(
-            rotation_matrix_desired_transpose, rotation_matrices
-        ) - torch.bmm(rotation_matrix_transpose, rotation_matrix_desired)
+            rotation_matrix_desired, 1, 2)
+        rot_err_mat = torch.bmm(rotation_matrix_desired_transpose, rotation_matrices) - \
+            torch.bmm(rotation_matrix_transpose, rotation_matrix_desired)
         rot_err = 0.5 * compute_vee_map(rot_err_mat)
 
         rotmat_euler_to_body_rates = torch.zeros_like(rotation_matrices)
@@ -92,38 +87,23 @@ class LeePositionController:
 
         euler_angle_rates = torch.zeros_like(euler_angles)
         yaw_setpoint = euler_angles[:, 2]
-        euler_angle_rates[:, 2] = torch.remainder(
-            (command_actions[:, 3] - yaw_setpoint), 3.14159265358979323846 * 2.0
-        )
+        euler_angle_rates[:, 2] = torch.remainder((command_actions[:, 3] - yaw_setpoint), 3.14159265358979323846 * 2.0)
+        
+        euler_angle_rates[:, 2] = torch.where(euler_angle_rates[:, 2] > 3.14159265358979323846, euler_angle_rates[:, 2] - 3.14159265358979323846 * 2.0, euler_angle_rates[:, 2])
 
-        euler_angle_rates[:, 2] = torch.where(
-            euler_angle_rates[:, 2] > 3.14159265358979323846,
-            euler_angle_rates[:, 2] - 3.14159265358979323846 * 2.0,
-            euler_angle_rates[:, 2],
-        )
-
-        omega_desired_body = torch.bmm(
-            rotmat_euler_to_body_rates, euler_angle_rates.unsqueeze(2)
-        ).squeeze(2)
+        omega_desired_body = torch.bmm(rotmat_euler_to_body_rates, euler_angle_rates.unsqueeze(2)).squeeze(2)
 
         # omega_des_body = [0, 0, yaw_rate] ## approximated body_rate as yaw_rate
         # omega_body = R_t @ omega_world
         # angvel_err = omega_body - R_t @ R_des @ omega_des_body
         # Refer to Lee et. al. (2010) for details (https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5717652)
-
-        desired_angvel_err = torch.bmm(
-            rotation_matrix_transpose,
-            torch.bmm(rotation_matrix_desired, omega_desired_body.unsqueeze(2)),
-        ).squeeze(2)
+        
+        desired_angvel_err = torch.bmm(rotation_matrix_transpose, torch.bmm(
+            rotation_matrix_desired, omega_desired_body.unsqueeze(2))).squeeze(2)
 
         actual_angvel_err = torch.bmm(
-            rotation_matrix_transpose, robot_state[:, 10:13].unsqueeze(2)
-        ).squeeze(2)
-
+            rotation_matrix_transpose, robot_state[:, 10:13].unsqueeze(2)).squeeze(2)
+        
         angvel_err = actual_angvel_err - desired_angvel_err
-        torque = (
-            -self.K_rot_tensor * rot_err
-            - self.K_angvel_tensor * angvel_err
-            + torch.cross(robot_state[:, 10:13], robot_state[:, 10:13], dim=1)
-        )
+        torque = - self.K_rot_tensor * rot_err - self.K_angvel_tensor * angvel_err + torch.cross(robot_state[:, 10:13],robot_state[:, 10:13], dim=1)
         return thrust_command, torque
