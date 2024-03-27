@@ -5,7 +5,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from .helpers import class_to_dict, get_args
-from .task_registry import task_registry
 from .logger import Logger
 from .math import *
 

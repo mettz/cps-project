@@ -30,7 +30,6 @@ class AerialRobotWithObstacles(BaseTask):
         sim_params,
         physics_engine,
         sim_device,
-        headless,
     ):
         self.cfg = cfg
 
@@ -40,14 +39,13 @@ class AerialRobotWithObstacles(BaseTask):
         self.sim_params = sim_params
         self.physics_engine = physics_engine
         self.sim_device_id = sim_device
-        self.headless = headless
 
         self.enable_onboard_cameras = self.cfg.env.enable_onboard_cameras
 
         self.env_asset_manager = AssetManager(self.cfg, sim_device)
         self.cam_resolution = (480, 270)
 
-        super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+        super().__init__(self.cfg, sim_params, physics_engine, sim_device)
         self.root_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
         self.contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
 
@@ -437,8 +435,6 @@ class AerialRobotWithObstacles(BaseTask):
 
     def pre_physics_step(self, _actions):
         # resets
-        if self.counter % 250 == 0:
-            print("self.counter:", self.counter)
         self.counter += 1
 
         actions = _actions.to(self.device)
