@@ -9,6 +9,7 @@ import os
 import sys
 import time
 
+import cv2
 import numpy as np
 import torch
 from isaacgym import gymapi, gymtorch, gymutil
@@ -124,7 +125,8 @@ class AerialRobotWithObstacles(BaseTask):
 
         if self.cfg.env.enable_onboard_cameras:
             self.full_camera_array = torch.zeros(
-                (self.num_envs, 270, 480), device=self.device
+                (self.num_envs, self.cam_resolution[1], self.cam_resolution[0]),
+                device=self.device,
             )
 
         if self.viewer:
@@ -239,7 +241,10 @@ class AerialRobotWithObstacles(BaseTask):
                 )
                 self.camera_handles.append(cam_handle)
                 camera_tensor = self.gym.get_camera_image_gpu_tensor(
-                    self.sim, env_handle, cam_handle, gymapi.IMAGE_DEPTH
+                    self.sim,
+                    env_handle,
+                    cam_handle,
+                    gymapi.IMAGE_DEPTH,  # IMAGE_COLOR -> RGBA, IMAGE_DEPTH -> Depth
                 )
                 torch_cam_tensor = gymtorch.wrap_tensor(camera_tensor)
                 self.camera_tensors.append(torch_cam_tensor)
@@ -470,13 +475,26 @@ class AerialRobotWithObstacles(BaseTask):
 
     def render_cameras(self):
         self.gym.render_all_camera_sensors(self.sim)
-        self.gym.start_access_image_tensors(self.sim)
+        self.gym.start_access_image_tensors(
+            self.sim
+        )  # Take image tensors from GPU to memory
         self.dump_images()
         self.gym.end_access_image_tensors(self.sim)
         return
 
     def post_physics_step(self):
-        self.gym.refresh_actor_root_state_tensor(self.sim)
+        # Save dumped images to file in a png format
+        for env_id in range(self.num_envs):
+            image = self.full_camera_array[env_id].cpu().numpy()
+            image = np.transpose(image, (1, 2, 0))
+            image = np.flipud(image)
+            image = (255.0 * image).astype(np.uint8)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite("image_" + str(env_id) + ".png", image)
+
+        self.gym.refresh_actor_root_state_tensor(
+            self.sim
+        )  # Update all the tensors of simulation, refreshes the simulation
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
     def check_collisions(self):
@@ -490,7 +508,8 @@ class AerialRobotWithObstacles(BaseTask):
     def dump_images(self):
         for env_id in range(self.num_envs):
             # the depth values are in -ve z axis, so we need to flip it to positive
-            self.full_camera_array[env_id] = -self.camera_tensors[env_id]
+            # self.full_camera_array[env_id] = -self.camera_tensors[env_id]
+            self.full_camera_array[env_id] = self.camera_tensors[env_id]
 
     def compute_observations(self):
         self.obs_buf[..., :3] = self.root_positions

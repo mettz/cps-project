@@ -13,5 +13,12 @@ setup(
     license="MIT",
     packages=find_packages(),
     description="CPS project course 2023/2024",
-    install_requires=["isaacgym", "matplotlib", "numpy", "torch", "pytorch3d"],
+    install_requires=[
+        "isaacgym",
+        "matplotlib",
+        "numpy",
+        "torch",
+        "pytorch3d",
+        "opencv-python",
+    ],
 )
