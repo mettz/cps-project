@@ -188,7 +188,7 @@ class AssetManager:
 
             folder_path = os.path.join(self.asset_config.folder_path, asset_key)
 
-            file_list = ["cube.urdf"] * asset_class.num_assets
+            file_list = ["small_cube.urdf"] * asset_class.num_assets
 
             for file_name in file_list:
                 asset_dict = {
@@ -262,12 +262,12 @@ class AssetManager:
 
         # Sampled environment bounds
         self.env_lower_bound = (
-            torch.rand((self.num_envs, 3), device=self.device, requires_grad=False)
+            torch.ones((self.num_envs, 3), device=self.device, requires_grad=False)
             * self.env_lower_bound_diff
             + self.env_lower_bound_min
         )
         self.env_upper_bound = (
-            torch.rand((self.num_envs, 3), device=self.device, requires_grad=False)
+            torch.ones((self.num_envs, 3), device=self.device, requires_grad=False)
             * self.env_upper_bound_diff
             + self.env_upper_bound_min
         )

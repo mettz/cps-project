@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import numpy as np
+from isaacgym import gymapi
 
 from cps_project import cps_project_ROOT_DIR
 
@@ -20,11 +21,11 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
     seed = 1
 
     class env:
-        num_envs = 16
+        num_envs = 64
         num_observations = 13
         get_privileged_obs = True  # if True the states of all entitites in the environment will be returned as privileged observations, otherwise None will be returned
         num_actions = 4
-        env_spacing = 20.0  # not used with heightfields/trimeshes
+        env_spacing = 5.0  # not used with heightfields/trimeshes
         episode_length_s = 10  # episode length in seconds
         num_control_steps_per_env_step = (
             10  # number of control & physics steps between camera renders
@@ -43,6 +44,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         substeps = 1
         gravity = [0.0, 0.0, -9.81]  # [m/s^2]
         up_axis = 1  # 0 is y, 1 is z
+        camera = gymapi.IMAGE_DEPTH
 
         class physx:
             num_threads = 10
@@ -53,7 +55,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
             rest_offset = 0.0  # [m]
             bounce_threshold_velocity = 0.5  # [m/s]
             max_depenetration_velocity = 1.0
-            max_gpu_contact_pairs = 2**23  # 2**24 -> needed for 8000 envs and more
+            max_gpu_contact_pairs = 2**23  # 2**24 -> needed for 10000 envs and more
             default_buffer_size_multiplier = 5
             contact_collection = (
                 1  # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
@@ -191,7 +193,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         color = [70, 200, 100]
 
     class object_asset_params(asset_state_params):
-        num_assets = 10
+        num_assets = 20
 
         max_position_ratio = [0.95, 0.95, 0.95]  # min position as a ratio of the bounds
         min_position_ratio = [0.05, 0.05, 0.05]  # max position as a ratio of the bounds
@@ -212,7 +214,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         ]  # if > -900, use this value instead of randomizing
 
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         set_whole_body_semantic_mask = False
         set_semantic_mask_per_link = False
         semantic_id = OBJECT_SEMANTIC_ID
@@ -244,7 +246,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 200, 210]
 
@@ -273,7 +275,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 200, 210]
 
@@ -302,7 +304,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 200, 210]
 
@@ -331,7 +333,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 150, 150]
 
@@ -360,7 +362,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 200, 210]
 
@@ -389,7 +391,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         collapse_fixed_joints = False
         links_per_asset = 1
-        specific_filepath = "cube.urdf"
+        specific_filepath = "small_cube.urdf"
         semantic_id = WALL_SEMANTIC_ID
         color = [100, 200, 210]
 
@@ -400,14 +402,16 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
 
         include_env_bound_type = {
             "front_wall": True,
-            "left_wall": False,
+            "left_wall": True,
             "top_wall": False,
             "back_wall": True,
-            "right_wall": False,
+            "right_wall": True,
             "bottom_wall": False,
         }
 
-        env_lower_bound_min = [-5.0, -5.0, 0.0]  # lower bound for the environment space
-        env_lower_bound_max = [-5.0, -5.0, 0.0]  # lower bound for the environment space
-        env_upper_bound_min = [5.0, 5.0, 5.0]  # upper bound for the environment space
-        env_upper_bound_max = [5.0, 5.0, 5.0]  # upper bound for the environment space
+        # env_lower_bound_min = [-5.0, -5.0, 0.0]  # lower bound for the environment space
+        # env_lower_bound_max = [-5.0, -5.0, 0.0]  # lower bound for the environment space
+        env_lower_bound_min = [0.0, 5.0, 0.0]  # lower bound for the environment space
+        env_lower_bound_max = [0.0, 5.0, 0.0]  # lower bound for the environment space
+        env_upper_bound_min = [10.0, 10.0, 5.0]  # upper bound for the environment space
+        env_upper_bound_max = [10.0, 10.0, 5.0]  # upper bound for the environment space
