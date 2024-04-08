@@ -11,9 +11,9 @@ import time
 
 import cv2
 import numpy as np
-import torch
 from isaacgym import gymapi, gymtorch, gymutil
 from isaacgym.torch_utils import *
+import torch
 
 from cps_project import cps_project_ROOT_DIR
 from cps_project.envs.base.base_task import BaseTask
@@ -124,10 +124,16 @@ class AerialRobotWithObstacles(BaseTask):
         )
 
         if self.cfg.env.enable_onboard_cameras:
-            self.full_camera_array = torch.zeros(
-                (self.num_envs, self.cam_resolution[1], self.cam_resolution[0], 4),
-                device=self.device,
-            )
+            if self.cfg.sim.camera == gymapi.IMAGE_DEPTH:
+                self.full_camera_array = torch.zeros(
+                    (self.num_envs, self.cam_resolution[1], self.cam_resolution[0]),
+                    device=self.device,
+                )
+            else:
+                self.full_camera_array = torch.zeros(
+                    (self.num_envs, self.cam_resolution[1], self.cam_resolution[0], 4),
+                    device=self.device,
+                )
 
         if self.viewer:
             cam_pos_x, cam_pos_y, cam_pos_z = (
@@ -244,7 +250,7 @@ class AerialRobotWithObstacles(BaseTask):
                     self.sim,
                     env_handle,
                     cam_handle,
-                    gymapi.IMAGE_COLOR,  # IMAGE_COLOR -> RGBA, IMAGE_DEPTH -> Depth
+                    self.cfg.sim.camera,  # IMAGE_COLOR -> RGBA, IMAGE_DEPTH -> Depth
                 )
                 torch_cam_tensor = gymtorch.wrap_tensor(camera_tensor)
                 self.camera_tensors.append(torch_cam_tensor)
@@ -484,14 +490,14 @@ class AerialRobotWithObstacles(BaseTask):
 
     def post_physics_step(self):
         # Save dumped images to file in a png format
-        for env_id in range(self.num_envs):
-            image = self.full_camera_array[env_id].cpu().numpy()
-            # image = np.transpose(image)
-            # image = np.flipud(image)
-            image = (255.0 * image).astype(np.uint8)
+        # for env_id in range(self.num_envs):
+        # image = self.full_camera_array[env_id].cpu().numpy()
+        # image = np.transpose(image)
+        # image = np.flipud(image)
+        # image = (255.0 * image).astype(np.uint8)
 
-            image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGRA)
-            cv2.imwrite("image_" + str(env_id) + ".png", image)
+        # image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGRA)
+        # cv2.imwrite("image_" + str(env_id) + ".png", image)
 
         self.gym.refresh_actor_root_state_tensor(
             self.sim
@@ -509,8 +515,10 @@ class AerialRobotWithObstacles(BaseTask):
     def dump_images(self):
         for env_id in range(self.num_envs):
             # the depth values are in -ve z axis, so we need to flip it to positive
-            self.full_camera_array[env_id] = -self.camera_tensors[env_id]
-            # self.full_camera_array[env_id] = self.camera_tensors[env_id]
+            if self.cfg.sim.camera == gymapi.IMAGE_DEPTH:
+                self.full_camera_array[env_id] = -self.camera_tensors[env_id]
+            else:
+                self.full_camera_array[env_id] = self.camera_tensors[env_id]
 
     def compute_observations(self):
         self.obs_buf[..., :3] = self.root_positions

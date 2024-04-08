@@ -1,10 +1,11 @@
-from isaacgym import gymutil
-import torch
-import numpy as np
 import os
 
+import numpy as np
+from isaacgym import gymutil
+import torch
+
 from cps_project.envs import AerialRobotWithObstacles, AerialRobotWithObstaclesCfg
-from cps_project.utils.helpers import parse_sim_params, class_to_dict
+from cps_project.utils.helpers import class_to_dict, parse_sim_params
 
 
 def main():
@@ -51,7 +52,7 @@ def main():
     task.reset()
     i = 1
     print("Starting simulation. Press Ctrl+C to stop it.")
-    while True:
+    for i in range(3000):
         print(f"Simulation step {i}", end="\r")
         task.step(command_actions)
         i += 1
