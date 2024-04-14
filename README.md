@@ -25,17 +25,3 @@ Books:
 
 python3 example.py # or python3 example.py --task="quad_with_obstacles"
 
-### Notes for next alignment
-
-From NVIDIA docs (see [here](./docs/Isaacgym_docs/programming/graphics.html?highlight=image_depth))
-
-Each camera renders a number of different output images. When accessing images, APIs take an image selector which indicates which of the output images the application would like to retrieve or access.
-
-Camera Sensor Image Types:
-IMAGE_COLOR - 4x 8 bit unsigned int - RGBA color
-
-IMAGE_DEPTH - float - negative distance from camera to pixel in view direction in world coordinate units (meters)
-
-IMAGE_SEGMENTATION - 32bit unsigned int - ground truth semantic segmentation of each pixel. See
-
-IMAGE_OPTICAL_FLOW - 2x 16bit signed int - screen space motion vector per pixel, normalized

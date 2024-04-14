@@ -7,14 +7,15 @@
 import torch
 
 from cps_project.envs.controllers.attitude_control import LeeAttitudeContoller
+from cps_project.envs.controllers.ctbr_controller import CTBRController
 from cps_project.envs.controllers.position_control import LeePositionController
 from cps_project.envs.controllers.velocity_control import LeeVelocityController
-
 
 control_class_dict = {
     "lee_position_control": LeePositionController,
     "lee_velocity_control": LeeVelocityController,
     "lee_attitude_control": LeeAttitudeContoller,
+    "ctbr_control": CTBRController,
 }
 
 
@@ -53,6 +54,8 @@ class Controller:
                 )
             elif control_class_dict[self.controller_name] is LeeVelocityController:
                 self.controller = LeeVelocityController(self.kV, self.kR, self.kOmega)
+            elif control_class_dict[self.controller_name] is CTBRController:
+                self.controller = CTBRController(self.device)
             else:
                 raise ValueError(
                     "Invalid controller name: {}".format(self.control_config.controller)

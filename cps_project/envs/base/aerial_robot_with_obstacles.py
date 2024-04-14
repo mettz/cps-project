@@ -11,9 +11,9 @@ import time
 
 import cv2
 import numpy as np
+import torch
 from isaacgym import gymapi, gymtorch, gymutil
 from isaacgym.torch_utils import *
-import torch
 
 from cps_project import cps_project_ROOT_DIR
 from cps_project.envs.base.base_task import BaseTask
@@ -461,11 +461,23 @@ class AerialRobotWithObstacles(BaseTask):
         output_thrusts_mass_normalized, output_torques_inertia_normalized = (
             self.controller(self.root_states, self.action_input)
         )
+        print("output_thrusts_mass_normalized: ", output_thrusts_mass_normalized)
+        print(
+            "output_torques_inertia_normalized: ",
+            output_torques_inertia_normalized[0, :],
+        )
+
+        # Compute Friction forces (opposite to drone vels)
+        friction = -0.02 * torch.sign(self.root_linvels) * self.root_linvels**2
+        # self.forces[:, 0, 2] = output_thrusts_mass_normalized + friction[:, 2]
+
         self.forces[:, 0, 2] = (
             self.robot_mass
             * (-self.sim_params.gravity.z)
             * output_thrusts_mass_normalized
+            + friction[:, 2]
         )
+
         self.torques[:, 0] = output_torques_inertia_normalized
         self.forces = torch.where(
             self.forces < 0, torch.zeros_like(self.forces), self.forces
