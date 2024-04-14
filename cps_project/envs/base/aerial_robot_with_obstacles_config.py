@@ -21,7 +21,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
     seed = 1
 
     class env:
-        num_envs = 64
+        num_envs = 16
         num_observations = 13
         get_privileged_obs = True  # if True the states of all entitites in the environment will be returned as privileged observations, otherwise None will be returned
         num_actions = 4
@@ -74,7 +74,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         kOmega: gains for angular velocity
         """
 
-        controller = "lee_velocity_control"  # or "lee_velocity_control" or "lee_attitude_control"
+        controller = "ctbr_control"  # "lee_velocity_control" or "lee_position_control" or "lee_attitude_control" or "ctbr_control"
         kP = [0.8, 0.8, 1.0]  # used for lee_position_control only
         kV = [0.5, 0.5, 0.4]  # used for lee_position_control, lee_velocity_control only
         kR = [
@@ -95,7 +95,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         ]  # scale the input to the controller from -1 to 1 for each dimension
 
     class robot_asset:
-        file = "{cps_project_ROOT_DIR}/resources/robots/quad/model.urdf"
+        file = "{cps_project_ROOT_DIR}/resources/robots/quad/crazyflie2.urdf"
         name = "aerial_robot"  # actor name
         base_link_name = "base_link"
         disable_gravity = False

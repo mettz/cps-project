@@ -1,0 +1,4 @@
+1 - Il controllore di Sebastiano calcola l'attrito, quelli della repo no. Dobbiamo considerarlo?
+    Per ora lo abbiamo tralasciato
+
+2 - Perchè nello pseudocodice del controllore fornito il controllore viene eseguito dopo sim.step()?
