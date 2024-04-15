@@ -162,3 +162,5 @@ cython_debug/
 # pytorch raw data
 *ubyte
 *ubyte.gz
+
+resources/skrl/runs
