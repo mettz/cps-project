@@ -2,3 +2,11 @@
     Per ora lo abbiamo tralasciato
 
 2 - Perchè nello pseudocodice del controllore fornito il controllore viene eseguito dopo sim.step()?
+    Noi lo eseguiamo in pre-physics
+
+3 - Perchè i bound sulla coppia vengono calcolati con quella formula?
+
+4 - La funzione wrap_env di SKRL sembra aspettarsi un env che eredita da VecTask, ma la repo non la usa.
+    Dobbiamo integrarlo o dovrebbe funzionare lo stesso? La strada giusta è adattare BasicTask a VecTask o 
+    ci sono altre possibilità?
+

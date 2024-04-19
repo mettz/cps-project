@@ -472,11 +472,13 @@ class AerialRobotWithObstacles(BaseTask):
         # self.forces[:, 0, 2] = output_thrusts_mass_normalized + friction[:, 2]
 
         self.forces[:, 0, 2] = (
-            self.robot_mass
-            * (-self.sim_params.gravity.z)
-            * output_thrusts_mass_normalized
-            + friction[:, 2]
+            # self.robot_mass
+            # * (-self.sim_params.gravity.z)
+            # * output_thrusts_mass_normalized
+            output_thrusts_mass_normalized
         )
+
+        self.forces[:, 0] += friction
 
         self.torques[:, 0] = output_torques_inertia_normalized
         self.forces = torch.where(
