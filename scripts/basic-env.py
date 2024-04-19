@@ -7,6 +7,8 @@ import torch
 from cps_project.envs import AerialRobotWithObstacles, AerialRobotWithObstaclesCfg
 from cps_project.utils.helpers import class_to_dict, parse_sim_params
 
+from skrl.envs.wrappers.torch import wrap_env
+
 
 def main():
     # TODO: check why this is needed
@@ -40,6 +42,8 @@ def main():
         sim_device=args.sim_device,
     )
 
+    # env = wrap_env(task)
+
     print("Number of environments", cfg.env.num_envs)
 
     # these are the actions commanded to the drone
@@ -47,7 +51,7 @@ def main():
     command_actions[:, 0] = 0.0  # velocity along x
     command_actions[:, 1] = 0.0  # velocity along y
     command_actions[:, 2] = 0.0  # velocity along z
-    command_actions[:, 3] = 0.0  # yaw rate
+    command_actions[:, 3] = -1.0  # yaw rate
 
     task.reset()
     i = 1
