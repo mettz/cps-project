@@ -1,0 +1,70 @@
+# used to create the object
+name: Quadrotor
+
+physics_engine: "physx"
+
+assets:
+  path: "resources/models"  # path to the assets
+
+  quadrotor:
+    file: "robots/quad/crazyflie2.urdf" # this is relative to assets.path
+    name: "aerial_robot"  # actor name
+    base_link_name: "base_link"
+    options:
+      disable_gravity: False
+      collapse_fixed_joints: True  # merge bodies connected by fixed joints.
+      fix_base_link: False  # fix the base of the robot
+      collision_disabled: 0  # 1 to disable, 0 to enable...bitwise filter
+      replace_cylinder_with_capsule: False  # replace collision cylinders with capsules, leads to faster/more stable simulation
+      flip_visual_attachments: True  # Some .obj meshes must be flipped from y-up to z-up
+      density: 0.001
+      angular_damping: 0.0
+      linear_damping: 0.0
+      max_angular_velocity: 100.0
+      max_linear_velocity: 100.0
+      armature: 0.001
+
+# if given, will override the device setting in gym. 
+env:
+  numEnvs: 16
+  envSpacing: 1.25
+  maxEpisodeLength: 500
+  enableDebugVis: False
+
+  clipObservations: 5.0
+  clipActions: 1.0
+
+  # set to True if you use camera sensors in the environment
+  enableCameraSensors: False
+
+  image:
+    resolution:
+      width: 480
+      height: 270
+
+sim:
+  dt: 0.01
+  substeps: 2
+  up_axis: "z"
+  use_gpu_pipeline: True
+  gravity: [0.0, 0.0, -9.81]
+  camera: "depth"
+  physx:
+    num_threads: 4
+    solver_type: 1
+    use_gpu: True # set to False to run on CPU
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.001
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 1000.0
+    default_buffer_size_multiplier: 5.0
+    max_gpu_contact_pairs: 1048576 # 1024*1024
+    num_subscenes: 4
+    contact_collection: 0 # 0: CC_NEVER (don't collect contact info), 1: CC_LAST_SUBSTEP (collect only contacts on last substep), 2: CC_ALL_SUBSTEPS (broken - do not use!)
+    
+task:
+  randomize: False
+
+
