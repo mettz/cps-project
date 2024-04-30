@@ -1,13 +1,11 @@
 import os
 
 import numpy as np
+import yaml
 from isaacgym import gymutil
 import torch
 
-from cps_project.envs import AerialRobotWithObstacles, AerialRobotWithObstaclesCfg
-from cps_project.utils.helpers import class_to_dict, parse_sim_params
-
-from skrl.envs.wrappers.torch import wrap_env
+from cps_project.tasks.quadrotor import Quadrotor
 
 
 def main():
@@ -27,27 +25,43 @@ def main():
                 "type": int,
                 "default": "256",
                 "help": "Number of environments to create. Overrides config file if provided.",
-            }
+            },
+            {
+                "name": "--config",
+                "type": str,
+                "default": "../cps_project/cfg/Quadrotor.yaml",
+                "help": "Path to the configuration file. Overrides default configuration.",
+            },
         ],
     )
+    # Open yaml file and read the configuration
 
-    cfg = AerialRobotWithObstaclesCfg()
-    sim_params = {"sim": class_to_dict(cfg.sim)}
-    sim_params = parse_sim_params(args, sim_params)
+    # Combine the base directory with the relative path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cfg_path = os.path.abspath(os.path.join(script_dir, args.config))
+    print(f"Using configuration file: {cfg_path}")
 
-    task = AerialRobotWithObstacles(
+    # Get the absolute path by combining it with the current working directory
+
+    with open(cfg_path) as file:
+        cfg = yaml.load(file, Loader=yaml.FullLoader)
+
+    task = Quadrotor(
         cfg=cfg,
-        sim_params=sim_params,
-        physics_engine=args.physics_engine,
-        sim_device=args.sim_device,
+        rl_device="cuda:0",
+        sim_device="cuda:0",
+        graphics_device_id=0,
+        headless=False,
+        virtual_screen_capture=False,
+        force_render=True,
     )
 
     # env = wrap_env(task)
 
-    print("Number of environments", cfg.env.num_envs)
+    print("Number of environments", task.num_envs)
 
     # these are the actions commanded to the drone
-    command_actions = torch.zeros((cfg.env.num_envs, cfg.env.num_actions))
+    command_actions = torch.zeros((task.num_envs, task.num_actions))
     command_actions[:, 0] = 0.0  # velocity along x
     command_actions[:, 1] = 0.0  # velocity along y
     command_actions[:, 2] = 0.0  # velocity along z
