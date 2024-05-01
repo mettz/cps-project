@@ -1,22 +1,23 @@
 import torch
 
 
-class CTRBctrl:
-    def __init__(self, num_envs) -> None:
+class Controller:
+    def __init__(self, num_envs, device) -> None:
+        self.num_envs = num_envs
         self.body_drone_angvels = torch.zeros(
-            (num_envs, 3), device=self.device, dtype=torch.float32
+            (self.num_envs, 3), device=device, dtype=torch.float32
         )
         self.body_drone_linvels = torch.zeros_like(self.body_drone_angvels)
         self.error = torch.zeros_like(self.body_drone_angvels)
         self.tau_des = torch.zeros_like(self.body_drone_angvels)
 
-        self.B = torch.zeros((num_envs, 4), device=self.device, dtype=torch.float32)
+        self.B = torch.zeros((self.num_envs, 4), device=device, dtype=torch.float32)
         self.thrust = torch.zeros_like(self.B)
 
         # Drone parameters
         # equations ref https://rpg.ifi.uzh.ch/docs/ICRA15_Faessler.pdf
-        self.real_thrust_upbound = torch.tensor([0.15], device=self.device)
-        self.real_thrust_lowbound = torch.tensor([0.0], device=self.device)
+        self.real_thrust_upbound = torch.tensor([0.15], device=device)
+        self.real_thrust_lowbound = torch.tensor([0.0], device=device)
         diag = 0.04
         rot_tau_coeff = 0.00596
         # Parameters matrix of the drone
@@ -27,25 +28,21 @@ class CTRBctrl:
                 [rot_tau_coeff, -rot_tau_coeff, rot_tau_coeff, -rot_tau_coeff],
                 [1, 1, 1, 1],
             ],
-            device=self.device,
+            device=device,
             dtype=torch.float32,
         )
 
-        self.A = self.base_A.repeat(num_envs, 1, 1)
+        self.A = self.base_A.repeat(self.num_envs, 1, 1)
         self.inv_A = torch.linalg.inv(self.A)
 
         # Proportional gain matrix
-        self.P = torch.zeros(
-            (self.num_envs, 3, 3), device=self.device, dtype=torch.float32
-        )
+        self.P = torch.zeros((self.num_envs, 3, 3), device=device, dtype=torch.float32)
         self.P[:, 0, 0] = 50
         self.P[:, 1, 1] = 50
         self.P[:, 2, 2] = 50
 
         # Inertia matrix
-        self.J = torch.zeros(
-            (self.num_envs, 3, 3), device=self.device, dtype=torch.float32
-        )
+        self.J = torch.zeros((self.num_envs, 3, 3), device=device, dtype=torch.float32)
         self.J[:, 0, 0] = 2.3951e-5
         self.J[:, 1, 1] = 2.3951e-5
         self.J[:, 2, 2] = 3.2347e-5
@@ -138,41 +135,43 @@ class CTRBctrl:
             * 2.0
         )
 
+        return a + b + c
+
 
 # if __name__ == "__main__":
-## EXAMPLE - PSEUDO CODE: not working!!
+#     ## EXAMPLE - PSEUDO CODE: not working!!
 
-# sim_steps = 1000
-# num_envs = 2048
-# bodies_per_env = 1
-# device = "gpu"
-# controller = CTRBctrl(num_envs)
-# sim = Isaacgym.create_simulation()
-# nn = Model.mlp()
-# friction = torch.zeros(
-#     (num_envs, bodies_per_env, 3), device=device, dtype=torch.float32
-# )
-
-# for _ in range(sim_steps):
-#     state = sim.step()
-#     actions = nn(state)
-
-#     total_torque, common_thrust = controller.update(
-#         actions, state.drone_quats, state.drone_angvels, state.drone_linvels
+#     sim_steps = 1000
+#     num_envs = 2048
+#     bodies_per_env = 1
+#     device = "gpu"
+#     controller = CTRBctrl(num_envs)
+#     sim = Isaacgym.create_simulation()
+#     nn = Model.mlp()
+#     friction = torch.zeros(
+#         (num_envs, bodies_per_env, 3), device=device, dtype=torch.float32
 #     )
 
-#     # Compute Friction forces (opposite to drone vels)
-#     friction[:, drone_handle, :] = (
-#         -0.02 * torch.sign(body_drone_linvels) * body_drone_linvels**2
-#     )
-#     tot_f = common_thrust + friction
+#     for _ in range(sim_steps):
+#         state = sim.step()
+#         actions = nn(state)
 
-#     # Apply forces and torques to the drone
-#     gym.apply_rigid_body_force_tensors(
-#         sim,
-#         gymtorch.unwrap_tensor(tot_f),
-#         gymtorch.unwrap_tensor(total_torque),
-#         gymapi.LOCAL_SPACE,
-#     )
+#         total_torque, common_thrust = controller.update(
+#             actions, state.drone_quats, state.drone_angvels, state.drone_linvels
+#         )
 
-# print("Done")
+#         # Compute Friction forces (opposite to drone vels)
+#         friction[:, drone_handle, :] = (
+#             -0.02 * torch.sign(body_drone_linvels) * body_drone_linvels**2
+#         )
+#         tot_f = common_thrust + friction
+
+#         # Apply forces and torques to the drone
+#         gym.apply_rigid_body_force_tensors(
+#             sim,
+#             gymtorch.unwrap_tensor(tot_f),
+#             gymtorch.unwrap_tensor(total_torque),
+#             gymapi.LOCAL_SPACE,
+#         )
+
+#     print("Done")
