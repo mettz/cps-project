@@ -11,10 +11,10 @@ assets:
     name: "aerial_robot"  # actor name
     base_link_name: "base_link"
     options:
-      disable_gravity: False
+      disable_gravity: True
       collapse_fixed_joints: True  # merge bodies connected by fixed joints.
-      fix_base_link: False  # fix the base of the robot
-      collision_disabled: 0  # 1 to disable, 0 to enable...bitwise filter
+      fix_base_link: False  # fix the base of the robot.  
+      collision_disabled: 0  # 1 to disable, 0 to enable...bitwise filtera
       replace_cylinder_with_capsule: False  # replace collision cylinders with capsules, leads to faster/more stable simulation
       flip_visual_attachments: True  # Some .obj meshes must be flipped from y-up to z-up
       density: 0.001
