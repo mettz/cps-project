@@ -124,14 +124,15 @@ class Quadrotor(VecTask):
             "self.root_states[env_ids] before rand_float: ", self.root_states[env_ids]
         )
 
-        self.root_states[env_ids, 0, 0:3] = torch_rand_float(
-            0.0, 0.0, (num_resets, 3), self.device
+        self.root_states[env_ids, 0, 0:2] = torch_rand_float(
+            0.0, 0.0, (num_resets, 2), self.device
         )
+        self.root_states[env_ids, 0, 2] = 1.0
 
-        self.root_states[env_ids, 0, 3:6] = torch_rand_float(
-            0.0, 0.0, (num_resets, 3), self.device
-        )
-        self.root_states[env_ids, 0, 6] = 1.0
+        # self.root_states[env_ids, 0, 3:6] = torch_rand_float(
+        #     0.0, 0.0, (num_resets, 3), self.device
+        # )
+        # self.root_states[env_ids, 0, 6] = 1.0
 
         self.root_states[env_ids, 0, 7:10] = torch_rand_float(
             0.0, 0.0, (num_resets, 3), self.device
@@ -228,33 +229,16 @@ class Quadrotor(VecTask):
         quad_cfg_options = quad_cfg["options"]
 
         quad_options = gymapi.AssetOptions()
-        quad_options.collapse_fixed_joints = quad_cfg_options["collapse_fixed_joints"]
-        quad_options.replace_cylinder_with_capsule = quad_cfg_options[
-            "replace_cylinder_with_capsule"
-        ]
-        quad_options.flip_visual_attachments = quad_cfg_options[
-            "flip_visual_attachments"
-        ]
         quad_options.fix_base_link = quad_cfg_options["fix_base_link"]
-        quad_options.density = quad_cfg_options["density"]
         quad_options.angular_damping = quad_cfg_options["angular_damping"]
-        quad_options.linear_damping = quad_cfg_options["linear_damping"]
         quad_options.max_angular_velocity = quad_cfg_options["max_angular_velocity"]
-        quad_options.max_linear_velocity = quad_cfg_options["max_linear_velocity"]
         quad_options.disable_gravity = quad_cfg_options["disable_gravity"]
 
         quad_asset = self.gym.load_asset(
             self.sim, self.assets_path, quad_file, quad_options
         )
         quad_start_pose = gymapi.Transform()
-        quad_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
-        # axis = [-1, 0, 0]
-        # quad_start_pose.r = gymapi.Quat(
-        #     np.sin(np.pi / 4) * axis[0],
-        #     np.sin(np.pi / 4) * axis[1],
-        #     np.sin(np.pi / 4) * axis[2],
-        #     np.cos(np.pi / 4),
-        # )
+        quad_start_pose.p.z = 1.0
 
         # Set Camera Properties
         camera_props = gymapi.CameraProperties()
