@@ -10,3 +10,7 @@
     Dobbiamo integrarlo o dovrebbe funzionare lo stesso? La strada giusta è adattare BasicTask a VecTask o 
     ci sono altre possibilità?
 
+=================
+
+5 - Perchè la z del drone è zero svolazza il drone?
+6 - Cosa facciamo se la posa del drone è su un ostacolo?

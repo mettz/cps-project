@@ -408,10 +408,21 @@ class AerialRobotWithObstacles(BaseTask):
             self.env_asset_manager.asset_pose_tensor[env_ids, :, 0:3]
         )
 
+        print(
+            "asset_pose_tensor: ",
+            self.env_asset_manager.asset_pose_tensor[env_ids, :, 0:3],
+        )
+
         euler_angles = self.env_asset_manager.asset_pose_tensor[env_ids, :, 3:6]
         self.env_asset_root_states[env_ids, :, 3:7] = quat_from_euler_xyz(
             euler_angles[..., 0], euler_angles[..., 1], euler_angles[..., 2]
         )
+
+        print(
+            "asset_orient: ",
+            self.env_asset_root_states[env_ids, :, 3:7],
+        )
+
         self.env_asset_root_states[env_ids, :, 7:13] = 0.0
 
         # get environment lower and upper bounds
@@ -460,11 +471,6 @@ class AerialRobotWithObstacles(BaseTask):
 
         output_thrusts_mass_normalized, output_torques_inertia_normalized = (
             self.controller(self.root_states, self.action_input)
-        )
-        print("output_thrusts_mass_normalized: ", output_thrusts_mass_normalized)
-        print(
-            "output_torques_inertia_normalized: ",
-            output_torques_inertia_normalized[0, :],
         )
 
         # Compute Friction forces (opposite to drone vels)
