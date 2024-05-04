@@ -119,21 +119,37 @@ class Quadrotor(VecTask):
         actor_indices = self.all_actor_indices[env_ids].flatten()
 
         self.root_states[env_ids] = self.initial_root_states[env_ids]
-        self.root_states[env_ids, 0, 0:3] = torch_rand_float(
-            -1.0, 1.0, (num_resets, 3), self.device
+
+        print(
+            "self.root_states[env_ids] before rand_float: ", self.root_states[env_ids]
         )
+
+        self.root_states[env_ids, 0, 0:3] = torch_rand_float(
+            0.0, 0.0, (num_resets, 3), self.device
+        )
+
+        self.root_states[env_ids, 0, 3:6] = torch_rand_float(
+            0.0, 0.0, (num_resets, 3), self.device
+        )
+        self.root_states[env_ids, 0, 6] = 1.0
+
         self.root_states[env_ids, 0, 7:10] = torch_rand_float(
-            -1.0, 1.0, (num_resets, 3), self.device
+            0.0, 0.0, (num_resets, 3), self.device
         )
         self.root_states[env_ids, 0, 10:13] = torch_rand_float(
-            -1.0, 1.0, (num_resets, 3), self.device
+            0.0, 0.0, (num_resets, 3), self.device
         )
 
-        quad_start_pose = torch.zeros((num_resets, 4), device=self.device)
-        quad_start_pose[:, 0] = -np.sin(np.pi / 4)
-        quad_start_pose[:, 3] = np.cos(np.pi / 4)
+        print("self.root_states[env_ids] after rand_float: ", self.root_states[env_ids])
 
-        self.root_states[env_ids, 0, 3:7] = quad_start_pose
+        # quad_start_pose = 0.001 * torch.zeros((num_resets, 4), device=self.device)
+        # # quad_start_pose[:, 0] = -np.sin(np.pi / 4)
+        # # quad_start_pose[:, 3] = np.cos(np.pi / 4)
+        # quad_start_pose[:, -1] = 1.0
+
+        # self.root_states[env_ids, 0, 3:7] = quad_start_pose
+
+        print("self.root_states[env_ids] after start pose: ", self.root_states[env_ids])
 
         self.gym.set_actor_root_state_tensor_indexed(
             self.sim,
@@ -148,30 +164,38 @@ class Quadrotor(VecTask):
     def pre_physics_step(self, _actions):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
+            print("len(reset_env_ids): ", len(reset_env_ids))
+            print("reset_env_ids: ", reset_env_ids)
             self.reset_idx(reset_env_ids)
 
-        actions = _actions.to(self.device)
+        # actions = _actions.to(self.device)
 
-        total_torque, common_thrust = self.controller.update(
-            actions,
-            self.root_rotations[:, 0],
-            self.root_angular_velocities[:, 0],
-            self.root_linear_velocities[:, 0],
-        )
+        # print("\nself.root_states[:, 0]: ", self.root_states[:, 0], "\n")
 
-        friction = (
-            -0.02
-            * torch.sign(self.root_linear_velocities[:, 0])
-            * self.root_linear_velocities[:, 0] ** 2
-        )
+        # total_torque, common_thrust = self.controller.update(
+        #     actions,
+        #     self.root_rotations[:, 0],
+        #     self.root_angular_velocities[:, 0],
+        #     self.root_linear_velocities[:, 0],
+        # )
 
-        self.forces[:, 0] = friction
-        self.forces[:, 0, 2] += common_thrust
-        self.torques[:, 0] = total_torque
+        # friction = (
+        #     -0.02
+        #     * torch.sign(self.root_linear_velocities[:, 0])
+        #     * self.root_linear_velocities[:, 0] ** 2
+        # )
 
-        # clear actions for reset envs
-        self.forces[reset_env_ids] = 0.0
-        self.torques[reset_env_ids] = 0.0
+        # self.forces[:, 0] = friction
+        # # print("\nCOMMON THRUST: ", common_thrust, "\n")
+        # self.forces[:, 0, 2] += common_thrust
+        # self.torques[:, 0] = total_torque
+
+        # # clear actions for reset envs
+        # self.forces[reset_env_ids] = 0.0
+        # self.torques[reset_env_ids] = 0.0
+
+        print("self.forces: ", self.forces)
+        print("self.torques: ", self.torques)
 
         # apply actions
         self.gym.apply_rigid_body_force_tensors(
@@ -182,6 +206,8 @@ class Quadrotor(VecTask):
         )
 
     def post_physics_step(self):
+        self.progress_buf += 1
+
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
 
@@ -222,13 +248,13 @@ class Quadrotor(VecTask):
         )
         quad_start_pose = gymapi.Transform()
         quad_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
-        axis = [-1, 0, 0]
-        quad_start_pose.r = gymapi.Quat(
-            np.sin(np.pi / 4) * axis[0],
-            np.sin(np.pi / 4) * axis[1],
-            np.sin(np.pi / 4) * axis[2],
-            np.cos(np.pi / 4),
-        )
+        # axis = [-1, 0, 0]
+        # quad_start_pose.r = gymapi.Quat(
+        #     np.sin(np.pi / 4) * axis[0],
+        #     np.sin(np.pi / 4) * axis[1],
+        #     np.sin(np.pi / 4) * axis[2],
+        #     np.cos(np.pi / 4),
+        # )
 
         # Set Camera Properties
         camera_props = gymapi.CameraProperties()
