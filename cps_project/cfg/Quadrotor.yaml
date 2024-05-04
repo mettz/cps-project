@@ -11,25 +11,18 @@ assets:
     name: "aerial_robot"  # actor name
     base_link_name: "base_link"
     options:
-      disable_gravity: True
-      collapse_fixed_joints: True  # merge bodies connected by fixed joints.
       fix_base_link: False  # fix the base of the robot.  
-      collision_disabled: 0  # 1 to disable, 0 to enable...bitwise filtera
-      replace_cylinder_with_capsule: False  # replace collision cylinders with capsules, leads to faster/more stable simulation
-      flip_visual_attachments: True  # Some .obj meshes must be flipped from y-up to z-up
-      density: 0.001
       angular_damping: 0.0
-      linear_damping: 0.0
       max_angular_velocity: 100.0
-      max_linear_velocity: 100.0
-      armature: 0.001
 
 # if given, will override the device setting in gym. 
 env:
   numEnvs: 16
-  envSpacing: 1.25
+  envSpacing: 5.0
   maxEpisodeLength: 500
   enableDebugVis: False
+
+  numObstacles: 10
 
   clipObservations: 5.0
   clipActions: 1.0
@@ -47,7 +40,7 @@ sim:
   substeps: 2
   up_axis: "z"
   use_gpu_pipeline: True
-  gravity: [0.0, 0.0, -9.81]
+  gravity: [0.0, 0.0, 0.0]
   camera: "depth"
   physx:
     num_threads: 4

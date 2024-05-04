@@ -74,7 +74,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         kOmega: gains for angular velocity
         """
 
-        controller = "ctbr_control"  # "lee_velocity_control" or "lee_position_control" or "lee_attitude_control" or "ctbr_control"
+        controller = "lee_velocity_control"  # "lee_velocity_control" or "lee_position_control" or "lee_attitude_control" or "ctbr_control"
         kP = [0.8, 0.8, 1.0]  # used for lee_position_control only
         kV = [0.5, 0.5, 0.4]  # used for lee_position_control, lee_velocity_control only
         kR = [
@@ -95,7 +95,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         ]  # scale the input to the controller from -1 to 1 for each dimension
 
     class robot_asset:
-        file = "{cps_project_ROOT_DIR}/resources/robots/quad/crazyflie2.urdf"
+        file = "{cps_project_ROOT_DIR}/resources/models/robots/quad/crazyflie2.urdf"
         name = "aerial_robot"  # actor name
         base_link_name = "base_link"
         disable_gravity = False
@@ -396,9 +396,9 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         color = [100, 200, 210]
 
     class asset_config:
-        folder_path = f"{cps_project_ROOT_DIR}/resources/models/environment_assets"
+        folder_path = f"{cps_project_ROOT_DIR}/resources/models/obstacles"
 
-        include_asset_type = {"thin": False, "trees": False, "objects": True}
+        include_asset_type = {"thin": False, "trees": False, "objects": False}
 
         include_env_bound_type = {
             "front_wall": True,
