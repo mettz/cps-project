@@ -461,24 +461,18 @@ class AerialRobotWithObstacles(BaseTask):
         output_thrusts_mass_normalized, output_torques_inertia_normalized = (
             self.controller(self.root_states, self.action_input)
         )
-        print("output_thrusts_mass_normalized: ", output_thrusts_mass_normalized)
-        print(
-            "output_torques_inertia_normalized: ",
-            output_torques_inertia_normalized[0, :],
-        )
 
         # Compute Friction forces (opposite to drone vels)
-        friction = -0.02 * torch.sign(self.root_linvels) * self.root_linvels**2
+        # friction = -0.02 * torch.sign(self.root_linvels) * self.root_linvels**2
         # self.forces[:, 0, 2] = output_thrusts_mass_normalized + friction[:, 2]
 
         self.forces[:, 0, 2] = (
-            # self.robot_mass
-            # * (-self.sim_params.gravity.z)
-            # * output_thrusts_mass_normalized
-            output_thrusts_mass_normalized
+            self.robot_mass
+            * (-self.sim_params.gravity.z)
+            * output_thrusts_mass_normalized
         )
 
-        self.forces[:, 0] += friction
+        # self.forces[:, 0] += friction
 
         self.torques[:, 0] = output_torques_inertia_normalized
         self.forces = torch.where(
@@ -486,12 +480,12 @@ class AerialRobotWithObstacles(BaseTask):
         )
 
         # apply actions
-        self.gym.apply_rigid_body_force_tensors(
-            self.sim,
-            gymtorch.unwrap_tensor(self.forces),
-            gymtorch.unwrap_tensor(self.torques),
-            gymapi.LOCAL_SPACE,
-        )
+        # self.gym.apply_rigid_body_force_tensors(
+        #     self.sim,
+        #     gymtorch.unwrap_tensor(self.forces),
+        #     gymtorch.unwrap_tensor(self.torques),
+        #     gymapi.LOCAL_SPACE,
+        # )
 
     def render_cameras(self):
         self.gym.render_all_camera_sensors(self.sim)

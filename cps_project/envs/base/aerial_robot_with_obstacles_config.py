@@ -74,7 +74,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         kOmega: gains for angular velocity
         """
 
-        controller = "ctbr_control"  # "lee_velocity_control" or "lee_position_control" or "lee_attitude_control" or "ctbr_control"
+        controller = "lee_velocity_control"  # "lee_velocity_control" or "lee_position_control" or "lee_attitude_control" or "ctbr_control"
         kP = [0.8, 0.8, 1.0]  # used for lee_position_control only
         kV = [0.5, 0.5, 0.4]  # used for lee_position_control, lee_velocity_control only
         kR = [
@@ -98,7 +98,7 @@ class AerialRobotWithObstaclesCfg(BaseConfig):
         file = "{cps_project_ROOT_DIR}/resources/robots/quad/crazyflie2.urdf"
         name = "aerial_robot"  # actor name
         base_link_name = "base_link"
-        disable_gravity = False
+        disable_gravity = True
         collapse_fixed_joints = True  # merge bodies connected by fixed joints.
         fix_base_link = False  # fix the base of the robot
         collision_mask = 0  # 1 to disable, 0 to enable...bitwise filter

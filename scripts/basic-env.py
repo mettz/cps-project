@@ -51,7 +51,7 @@ def main():
     command_actions[:, 0] = 0.0  # velocity along x
     command_actions[:, 1] = 0.0  # velocity along y
     command_actions[:, 2] = 0.0  # velocity along z
-    command_actions[:, 3] = -1.0  # yaw rate
+    command_actions[:, 3] = 0.0  # yaw rate
 
     task.reset()
     i = 1
