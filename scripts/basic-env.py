@@ -4,6 +4,7 @@ import numpy as np
 import yaml
 from isaacgym import gymutil
 import torch
+from skrl.envs.wrappers.torch import wrap_env
 
 from cps_project.tasks.quadrotor import Quadrotor
 
@@ -56,24 +57,25 @@ def main():
         force_render=True,
     )
 
-    # env = wrap_env(task)
+    env = wrap_env(task)
+    print("Environment created with device", env.device)
 
-    print("Number of environments", task.num_envs)
+    # print("Number of environments", task.num_envs)
 
-    # these are the actions commanded to the drone
-    command_actions = torch.zeros((task.num_envs, task.num_actions))
-    command_actions[:, 0] = 0.0  # velocity along x
-    command_actions[:, 1] = 0.0  # velocity along y
-    command_actions[:, 2] = 0.0  # velocity along z
-    command_actions[:, 3] = -1.0  # yaw rate
+    # # these are the actions commanded to the drone
+    # command_actions = torch.zeros((task.num_envs, task.num_actions))
+    # command_actions[:, 0] = 0.0  # velocity along x
+    # command_actions[:, 1] = 0.0  # velocity along y
+    # command_actions[:, 2] = 0.0  # velocity along z
+    # command_actions[:, 3] = -1.0  # yaw rate
 
-    task.reset()
-    i = 1
-    print("Starting simulation. Press Ctrl+C to stop it.")
-    for i in range(3000):
-        print(f"Simulation step {i}", end="\r")
-        task.step(command_actions)
-        i += 1
+    # task.reset()
+    # i = 1
+    # print("Starting simulation. Press Ctrl+C to stop it.")
+    # for i in range(3000):
+    #     print(f"Simulation step {i}", end="\r")
+    #     task.step(command_actions)
+    #     i += 1
 
 
 if __name__ == "__main__":

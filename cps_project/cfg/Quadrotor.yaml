@@ -22,7 +22,7 @@ env:
   maxEpisodeLength: 500
   enableDebugVis: False
 
-  numObstacles: 10
+  numObstacles: 50
 
   clipObservations: 5.0
   clipActions: 1.0

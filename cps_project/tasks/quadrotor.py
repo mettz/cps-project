@@ -56,6 +56,8 @@ class Quadrotor(VecTask):
         self.actors_per_env = len(self.actors) // self.num_envs
 
         self.root_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
+        self.contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
+
         vec_root_tensor = gymtorch.wrap_tensor(self.root_tensor).view(
             self.num_envs, self.actors_per_env, 13
         )
@@ -66,10 +68,14 @@ class Quadrotor(VecTask):
         self.root_linear_velocities = vec_root_tensor[..., 7:10]
         self.root_angular_velocities = vec_root_tensor[..., 10:13]
 
-        self.drone_position = self.root_positions[:, 0]
-        self.assets_positions = self.root_positions[:, 1:]
+        self.contact_forces = gymtorch.wrap_tensor(self.contact_force_tensor).view(
+            self.num_envs, self.actors_per_env, 3
+        )[:, 0]
+
+        self.collisions = torch.zeros(self.num_envs, device=self.device)
 
         self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
 
         self.initial_root_states = vec_root_tensor.clone()
 
@@ -125,6 +131,11 @@ class Quadrotor(VecTask):
         self.root_states[env_ids, 0, 0:3] = torch.tensor(
             [1.0, 1.0, 1.0], device=self.device
         )
+        self.root_states[env_ids, 0, 3:7] = torch.tensor(
+            [0.0, 0.0, 0.0, 1.0], device=self.device
+        )
+        self.root_states[env_ids, 0, 7:10] = 0.0
+        self.root_states[env_ids, 0, 10:13] = 0.0
 
         self.root_states[env_ids, 1, 0:3] = torch.tensor(
             [5.0, 0.0, 2.5],
@@ -148,7 +159,7 @@ class Quadrotor(VecTask):
         positions[:, :, 1] = positions[:, :, 1] * 5
         positions[:, :, 2] = positions[:, :, 2] * 5
 
-        # self.root_states[:, 5:, 0:3] = positions
+        self.root_states[:, 5:, 0:3] = positions
 
         self.gym.set_actor_root_state_tensor(
             self.sim,
@@ -157,6 +168,14 @@ class Quadrotor(VecTask):
 
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
+
+    def check_collisions(self):
+        ones = torch.ones((self.num_envs), device=self.device)
+        zeros = torch.zeros((self.num_envs), device=self.device)
+        self.collisions[:] = 0
+        self.collisions = torch.where(
+            torch.norm(self.contact_forces, dim=1) > 0.1, ones, zeros
+        )
 
     def pre_physics_step(self, _actions):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
@@ -201,6 +220,10 @@ class Quadrotor(VecTask):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
 
+        self.check_collisions()
+        ones = torch.ones_like(self.reset_buf)
+        self.reset_buf = torch.where(self.collisions > 0, ones, self.reset_buf)
+
     def _create_ground_plane(self):
         plane_params = gymapi.PlaneParams()
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
@@ -220,7 +243,7 @@ class Quadrotor(VecTask):
             self.sim, self.assets_path, quad_file, gymapi.AssetOptions()
         )
         quad_start_pose = gymapi.Transform()
-        quad_start_pose.p.z = 1.0
+        quad_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
 
         # Set Camera Properties
         camera_props = gymapi.CameraProperties()
@@ -236,39 +259,39 @@ class Quadrotor(VecTask):
         # orientation of the camera relative to the body
         local_transform.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
-        obstancle_options = gymapi.AssetOptions()
-        obstancle_options.fix_base_link = True
+        obstacle_options = gymapi.AssetOptions()
+        obstacle_options.fix_base_link = True
 
         left_wall_asset = self.gym.load_asset(
             self.sim,
             self.assets_path,
             "obstacles/walls/left_wall.urdf",
-            obstancle_options,
+            obstacle_options,
         )
         right_wall_asset = self.gym.load_asset(
             self.sim,
             self.assets_path,
             "obstacles/walls/right_wall.urdf",
-            obstancle_options,
+            obstacle_options,
         )
         front_wall_asset = self.gym.load_asset(
             self.sim,
             self.assets_path,
             "obstacles/walls/front_wall.urdf",
-            obstancle_options,
+            obstacle_options,
         )
         back_wall_asset = self.gym.load_asset(
             self.sim,
             self.assets_path,
             "obstacles/walls/back_wall.urdf",
-            obstancle_options,
+            obstacle_options,
         )
 
         cube_asset = self.gym.load_asset(
             self.sim,
             self.assets_path,
             "obstacles/objects/small_cube.urdf",
-            obstancle_options,
+            obstacle_options,
         )
 
         self.envs = []
@@ -291,48 +314,40 @@ class Quadrotor(VecTask):
             )
             self.actors.append(quad)
 
-            pose = gymapi.Transform()
-            pose.p = gymapi.Vec3(5.0, 0.0, 2.5)
             left_wall = self.gym.create_actor(
                 env,
                 left_wall_asset,
-                gymapi.Transform(),
+                quad_start_pose,
                 "left_wall",
                 i,
                 0,
                 8,
             )
 
-            pose = gymapi.Transform()
-            pose.p = gymapi.Vec3(5.0, 5.0, 2.5)
             right_wall = self.gym.create_actor(
                 env,
                 right_wall_asset,
-                gymapi.Transform(),
+                quad_start_pose,
                 "right_wall",
                 i,
                 0,
                 8,
             )
 
-            pose = gymapi.Transform()
-            pose.p = gymapi.Vec3(10.0, 2.5, 2.5)
             back_wall = self.gym.create_actor(
                 env,
                 back_wall_asset,
-                pose,
+                quad_start_pose,
                 "back_wall",
                 i,
                 0,
                 8,
             )
 
-            pose = gymapi.Transform()
-            pose.p = gymapi.Vec3(0.0, 2.5, 2.5)
             front_wall = self.gym.create_actor(
                 env,
                 front_wall_asset,
-                pose,
+                quad_start_pose,
                 "front_wall",
                 i,
                 0,
@@ -344,17 +359,17 @@ class Quadrotor(VecTask):
             self.actors.append(back_wall)
             self.actors.append(front_wall)
 
-            # for j in range(self.cfg["env"]["numObstacles"]):
-            #     cube = self.gym.create_actor(
-            #         env,
-            #         cube_asset,
-            #         gymapi.Transform(),
-            #         f"cube{j}",
-            #         i,
-            #         0,
-            #         3,
-            #     )
-            #     self.actors.append(cube)
+            for j in range(self.cfg["env"]["numObstacles"]):
+                cube = self.gym.create_actor(
+                    env,
+                    cube_asset,
+                    quad_start_pose,
+                    f"cube{j}",
+                    i,
+                    0,
+                    3,
+                )
+                self.actors.append(cube)
 
             cam = self.gym.create_camera_sensor(env, camera_props)
             self.gym.attach_camera_to_body(
