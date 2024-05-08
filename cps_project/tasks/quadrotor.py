@@ -3,6 +3,7 @@ from isaacgym import gymapi, gymtorch
 from isaacgym.torch_utils import *
 import torch
 
+from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
 from cps_project.utils.controller import Controller
@@ -28,10 +29,11 @@ class Quadrotor(VecTask):
         self.assets_path = self.cfg["assets"]["path"]
 
         # Observations: depth camera image
-        num_obs = (
-            self.image_cfg["resolution"]["width"]
-            * self.image_cfg["resolution"]["height"]
-        )
+        # num_obs = (
+        #     self.image_cfg["resolution"]["width"]
+        #     * self.image_cfg["resolution"]["height"]
+        # )
+        num_obs = 13
 
         # Actions:
         # 0. Roll
@@ -109,8 +111,8 @@ class Quadrotor(VecTask):
         )
 
         if self.viewer:
-            cam_pos = gymapi.Vec3(1.0, 1.0, 1.8)
-            cam_target = gymapi.Vec3(2.2, 2.0, 1.0)
+            cam_pos = gymapi.Vec3(1.0, 1.0, 20.0)
+            cam_target = gymapi.Vec3(0.0, 1.0, 1.0)
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def create_sim(self):
@@ -159,7 +161,7 @@ class Quadrotor(VecTask):
         positions[:, :, 1] = positions[:, :, 1] * 5
         positions[:, :, 2] = positions[:, :, 2] * 5
 
-        self.root_states[:, 5:, 0:3] = positions
+        # self.root_states[:, 5:, 0:3] = positions
 
         self.gym.set_actor_root_state_tensor(
             self.sim,
@@ -177,9 +179,13 @@ class Quadrotor(VecTask):
             torch.norm(self.contact_forces, dim=1) > 0.1, ones, zeros
         )
 
+        ones = torch.ones_like(self.reset_buf)
+        self.reset_buf = torch.where(self.collisions > 0, ones, self.reset_buf)
+
     def pre_physics_step(self, _actions):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
+            print("\nRESET ENV IDS: ", reset_env_ids, "\n")
             self.reset_idx(reset_env_ids)
 
         actions = _actions.to(self.device)
@@ -218,11 +224,11 @@ class Quadrotor(VecTask):
         self.progress_buf += 1
 
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
 
         self.check_collisions()
-        ones = torch.ones_like(self.reset_buf)
-        self.reset_buf = torch.where(self.collisions > 0, ones, self.reset_buf)
+        self.compute_observations()
+        self.compute_reward()
 
     def _create_ground_plane(self):
         plane_params = gymapi.PlaneParams()
@@ -299,6 +305,8 @@ class Quadrotor(VecTask):
         self.cameras = []
         self.camera_tensors = []
 
+        wall_color = gymapi.Vec3(100 / 255, 200 / 255, 210 / 255)
+
         for i in range(self.num_envs):
             env = self.gym.create_env(
                 self.sim, self.env_lower_bound, self.env_upper_bound, envs_per_row
@@ -323,6 +331,13 @@ class Quadrotor(VecTask):
                 0,
                 8,
             )
+            self.gym.set_rigid_body_color(
+                env,
+                left_wall,
+                0,
+                gymapi.MESH_VISUAL,
+                wall_color,
+            )
 
             right_wall = self.gym.create_actor(
                 env,
@@ -332,6 +347,13 @@ class Quadrotor(VecTask):
                 i,
                 0,
                 8,
+            )
+            self.gym.set_rigid_body_color(
+                env,
+                right_wall,
+                0,
+                gymapi.MESH_VISUAL,
+                wall_color,
             )
 
             back_wall = self.gym.create_actor(
@@ -343,6 +365,13 @@ class Quadrotor(VecTask):
                 0,
                 8,
             )
+            self.gym.set_rigid_body_color(
+                env,
+                back_wall,
+                0,
+                gymapi.MESH_VISUAL,
+                wall_color,
+            )
 
             front_wall = self.gym.create_actor(
                 env,
@@ -353,23 +382,40 @@ class Quadrotor(VecTask):
                 0,
                 8,
             )
+            self.gym.set_rigid_body_color(
+                env,
+                front_wall,
+                0,
+                gymapi.MESH_VISUAL,
+                wall_color,
+            )
 
             self.actors.append(left_wall)
             self.actors.append(right_wall)
             self.actors.append(back_wall)
             self.actors.append(front_wall)
 
-            for j in range(self.cfg["env"]["numObstacles"]):
-                cube = self.gym.create_actor(
-                    env,
-                    cube_asset,
-                    quad_start_pose,
-                    f"cube{j}",
-                    i,
-                    0,
-                    3,
-                )
-                self.actors.append(cube)
+            # for j in range(self.cfg["env"]["numObstacles"]):
+            #     cube = self.gym.create_actor(
+            #         env,
+            #         cube_asset,
+            #         quad_start_pose,
+            #         f"cube{j}",
+            #         i,
+            #         0,
+            #         3,
+            #     )
+            #     color = np.random.randint(low=50, high=200, size=3)
+
+            #     self.gym.set_rigid_body_color(
+            #         env,
+            #         cube,
+            #         0,
+            #         gymapi.MESH_VISUAL,
+            #         gymapi.Vec3(color[0] / 255, color[1] / 255, color[2] / 255),
+            #     )
+
+            #     self.actors.append(cube)
 
             cam = self.gym.create_camera_sensor(env, camera_props)
             self.gym.attach_camera_to_body(
@@ -393,3 +439,78 @@ class Quadrotor(VecTask):
 
             self.cameras.append(cam)
             self.envs.append(env)
+
+    def compute_observations(self):
+        target_x = 0.0
+        target_y = 0.0
+        target_z = 5.0
+        self.obs_buf[..., 0] = (target_x - self.root_positions[..., 0, 0]) / 3
+        self.obs_buf[..., 1] = (target_y - self.root_positions[..., 0, 1]) / 3
+        self.obs_buf[..., 2] = (target_z - self.root_positions[..., 0, 2]) / 3
+        self.obs_buf[..., 3:7] = self.root_rotations[..., 0, :]
+        self.obs_buf[..., 7:10] = self.root_linear_velocities[..., 0, :] / 2
+        self.obs_buf[..., 10:13] = self.root_angular_velocities[..., 0, :] / torch.pi
+        return self.obs_buf
+
+    def compute_reward(self):
+        self.rew_buf[:], self.reset_buf[:] = compute_quadcopter_reward(
+            self.root_positions[..., 0, :],
+            self.root_rotations[..., 0, :],
+            self.root_linear_velocities[..., 0, :],
+            self.root_angular_velocities[..., 0, :],
+            self.reset_buf,
+            self.progress_buf,
+            self.max_episode_length,
+        )
+        print("reset_buf: ", self.reset_buf)
+
+
+#####################################################################
+###=========================jit functions=========================###
+#####################################################################
+
+
+@torch.jit.script
+def compute_quadcopter_reward(
+    root_positions,
+    root_quats,
+    root_linvels,
+    root_angvels,
+    reset_buf,
+    progress_buf,
+    max_episode_length,
+):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float) -> Tuple[Tensor, Tensor]
+
+    # distance to target
+    target_dist = torch.sqrt(
+        root_positions[..., 0] * root_positions[..., 0]
+        + root_positions[..., 1] * root_positions[..., 1]
+        + (1 - root_positions[..., 2]) * (1 - root_positions[..., 2])
+    )
+    pos_reward = 1.0 / (1.0 + target_dist * target_dist)
+
+    # uprightness
+    ups = quat_axis(root_quats, 2)
+    tiltage = torch.abs(1 - ups[..., 2])
+    up_reward = 1.0 / (1.0 + tiltage * tiltage)
+
+    # spinning
+    spinnage = torch.abs(root_angvels[..., 2])
+    spinnage_reward = 1.0 / (1.0 + spinnage * spinnage)
+
+    # combined reward
+    # uprigness and spinning only matter when close to the target
+    reward = pos_reward + pos_reward * (up_reward + spinnage_reward)
+
+    # resets due to misbehavior
+    ones = torch.ones_like(reset_buf)
+    die = torch.zeros_like(reset_buf)
+    # die = torch.where(target_dist > 3.0, ones, die)
+    die = torch.where(root_positions[..., 2] < 0.1, ones, die)
+    die = torch.where(root_positions[..., 2] > 10.0, ones, die)
+
+    # resets due to episode length
+    reset = torch.where(progress_buf >= max_episode_length - 1, ones, die)
+
+    return reward, reset
