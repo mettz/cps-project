@@ -159,6 +159,9 @@ def main():
     # start training
     trainer.train()
 
+    # save the model
+    agent.save("agent.pt")
+
     # # ---------------------------------------------------------
     # # comment the code above: `trainer.train()`, and...
     # # uncomment the following lines to evaluate a trained agent
@@ -167,10 +170,10 @@ def main():
 
     # # download the trained agent's checkpoint from Hugging Face Hub and load it
     # path = download_model_from_huggingface("skrl/IsaacGymEnvs-Quadcopter-PPO", filename="agent.pt")
-    # agent.load(path)
+    # agent.load("agent.pt")
 
     # # start evaluation
-    # trainer.eval()
+    trainer.eval()
 
 
 if __name__ == "__main__":
