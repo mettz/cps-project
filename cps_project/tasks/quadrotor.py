@@ -140,28 +140,30 @@ class Quadrotor(VecTask):
         self.root_states[env_ids, 0, 10:13] = 0.0
 
         self.root_states[env_ids, 1, 0:3] = torch.tensor(
-            [5.0, 0.0, 2.5],
+            [0.0, 0.0, 2.5],
             device=self.device,
         )
         self.root_states[env_ids, 2, 0:3] = torch.tensor(
-            [5.0, 5.0, 2.5], device=self.device
+            [0.0, 5.0, 2.5], device=self.device
         )
         self.root_states[env_ids, 3, 0:3] = torch.tensor(
-            [10.0, 2.5, 2.5],
+            [5.0, 2.5, 2.5],
             device=self.device,
         )
         self.root_states[env_ids, 4, 0:3] = torch.tensor(
-            [0.0, 2.5, 2.5], device=self.device
+            [-5.0, 2.5, 2.5], device=self.device
         )
 
         positions = torch.rand(
-            self.num_envs, self.cfg["env"]["numObstacles"], 3, device=self.device
+            len(env_ids), self.cfg["env"]["numObstacles"], 3, device=self.device
         )
-        positions[:, :, 0] = positions[:, :, 0] * 10
+        print("randomizing positions of obstacles")
+
+        positions[:, :, 0] = positions[:, :, 0] * 10 - 5
         positions[:, :, 1] = positions[:, :, 1] * 5
         positions[:, :, 2] = positions[:, :, 2] * 5
 
-        # self.root_states[:, 5:, 0:3] = positions
+        self.root_states[env_ids, 5:, 0:3] = positions
 
         self.gym.set_actor_root_state_tensor(
             self.sim,
@@ -185,7 +187,8 @@ class Quadrotor(VecTask):
     def pre_physics_step(self, _actions):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
-            print("\nRESET ENV IDS: ", reset_env_ids, "\n")
+            print("resetting envs")
+            print(reset_env_ids)
             self.reset_idx(reset_env_ids)
 
         actions = _actions.to(self.device)
@@ -204,7 +207,6 @@ class Quadrotor(VecTask):
         )
 
         self.forces[:, 0] = friction
-        # print("\nCOMMON THRUST: ", common_thrust, "\n")
         self.forces[:, 0, 2] += common_thrust
         self.torques[:, 0] = total_torque
 
@@ -395,27 +397,27 @@ class Quadrotor(VecTask):
             self.actors.append(back_wall)
             self.actors.append(front_wall)
 
-            # for j in range(self.cfg["env"]["numObstacles"]):
-            #     cube = self.gym.create_actor(
-            #         env,
-            #         cube_asset,
-            #         quad_start_pose,
-            #         f"cube{j}",
-            #         i,
-            #         0,
-            #         3,
-            #     )
-            #     color = np.random.randint(low=50, high=200, size=3)
+            for j in range(self.cfg["env"]["numObstacles"]):
+                cube = self.gym.create_actor(
+                    env,
+                    cube_asset,
+                    quad_start_pose,
+                    f"cube{j}",
+                    i,
+                    0,
+                    3,
+                )
+                color = np.random.randint(low=50, high=200, size=3)
 
-            #     self.gym.set_rigid_body_color(
-            #         env,
-            #         cube,
-            #         0,
-            #         gymapi.MESH_VISUAL,
-            #         gymapi.Vec3(color[0] / 255, color[1] / 255, color[2] / 255),
-            #     )
+                self.gym.set_rigid_body_color(
+                    env,
+                    cube,
+                    0,
+                    gymapi.MESH_VISUAL,
+                    gymapi.Vec3(color[0] / 255, color[1] / 255, color[2] / 255),
+                )
 
-            #     self.actors.append(cube)
+                self.actors.append(cube)
 
             cam = self.gym.create_camera_sensor(env, camera_props)
             self.gym.attach_camera_to_body(
@@ -441,8 +443,8 @@ class Quadrotor(VecTask):
             self.envs.append(env)
 
     def compute_observations(self):
-        target_x = 0.0
-        target_y = 0.0
+        target_x = 2.5
+        target_y = 2.5
         target_z = 5.0
         self.obs_buf[..., 0] = (target_x - self.root_positions[..., 0, 0]) / 3
         self.obs_buf[..., 1] = (target_y - self.root_positions[..., 0, 1]) / 3
@@ -462,7 +464,6 @@ class Quadrotor(VecTask):
             self.progress_buf,
             self.max_episode_length,
         )
-        print("reset_buf: ", self.reset_buf)
 
 
 #####################################################################
@@ -507,8 +508,14 @@ def compute_quadcopter_reward(
     ones = torch.ones_like(reset_buf)
     die = torch.zeros_like(reset_buf)
     # die = torch.where(target_dist > 3.0, ones, die)
-    die = torch.where(root_positions[..., 2] < 0.1, ones, die)
-    die = torch.where(root_positions[..., 2] > 10.0, ones, die)
+
+    for i in range(3):
+        die = torch.where(root_positions[..., i] < 0.1, ones, die)
+        die = torch.where(
+            root_positions[..., i] > 10.0,
+            ones,
+            die,
+        )
 
     # resets due to episode length
     reset = torch.where(progress_buf >= max_episode_length - 1, ones, die)
