@@ -11,6 +11,12 @@ from cps_project.tasks.quadrotor import Quadrotor
 
 def main():
     # TODO: check why this is needed
+    """Setting seeds for random number generators is essential for reproducibility in computational experiments.
+    When random number generators are initialized with the same seed, they produce the same sequence of numbers
+    each time the code is run. This allows for consistent results, which is particularly important in machine learning and
+    reinforcement learning tasks where randomness plays a significant role."""
+    # direi che quindi in basic_env non serve
+
     seed = 1
     np.random.seed(seed)
     torch.manual_seed(seed)
