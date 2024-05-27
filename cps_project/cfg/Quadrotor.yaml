@@ -40,7 +40,7 @@ sim:
   substeps: 2
   up_axis: "z"
   use_gpu_pipeline: True
-  gravity: [0.0, 0.0, 0.0]
+  gravity: [0.0, 0.0, -9.81]
   camera: "depth"
   physx:
     num_threads: 12

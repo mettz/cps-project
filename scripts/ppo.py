@@ -17,6 +17,7 @@ from cps_project.tasks.quadrotor import Quadrotor
 import yaml
 import os
 import argparse
+import wandb
 
 # seed for reproducibility
 set_seed()  # e.g. `set_seed(42)` for fixed seed
@@ -153,14 +154,26 @@ def main():
     )
 
     # configure and instantiate the RL trainer
-    cfg_trainer = {"timesteps": 4000, "headless": True}
+    cfg_trainer = {"timesteps": 8000, "headless": False}
     trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
+
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="cps-project",
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": cfg["learning_rate"],
+            "epochs": cfg["learning_epochs"],
+        },
+    )
 
     # start training
     trainer.train()
 
     # save the model
     agent.save("agent.pt")
+
+    wandb.finish()
 
     # # ---------------------------------------------------------
     # # comment the code above: `trainer.train()`, and...
@@ -173,7 +186,7 @@ def main():
     # agent.load("agent.pt")
 
     # # start evaluation
-    trainer.eval()
+    # trainer.eval()
 
 
 if __name__ == "__main__":
