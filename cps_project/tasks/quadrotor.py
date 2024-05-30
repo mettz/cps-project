@@ -202,25 +202,39 @@ class Quadrotor(VecTask):
             self.reset_idx(reset_env_ids)
 
         actions = _actions.to(self.device)
+        wandb.log(
+            {
+                "yaw_rate": actions[0, 3].item(),
+                "vel_x": actions[0, 0].item(),
+                "vel_y": actions[0, 1].item(),
+                "vel_z": actions[0, 2].item(),
+            }
+        )
 
-        # total_torque, common_thrust = self.controller.update(
-        #     actions,
-        #     self.root_rotations[:, 0],
-        #     self.root_angular_velocities[:, 0],
-        #     self.root_linear_velocities[:, 0],
-        # )
+        total_torque, common_thrust = self.controller.update(
+            actions,
+            self.root_rotations[:, 0],
+            self.root_angular_velocities[:, 0],
+            self.root_linear_velocities[:, 0],
+        )
 
         friction = (
-            -0.02
+            -0.5
             * torch.sign(self.root_linear_velocities[:, 0])
             * self.root_linear_velocities[:, 0] ** 2
         )
 
-        # self.forces[:, 0] = friction
-        self.forces[:, 0, 2] = torch.clamp(
-            actions[:, 3], self.real_thrust_lowbound, self.real_thrust_upbound
+        # self.forces[:, 0] += friction
+        self.forces[:, 0, 2] = common_thrust
+        self.torques[:, 0] = total_torque
+        wandb.log(
+            {
+                "thrust": common_thrust[0].item(),
+                "torque_x": total_torque[0, 0].item(),
+                "torque_y": total_torque[0, 1].item(),
+                "torque_z": total_torque[0, 2].item(),
+            }
         )
-        self.torques[:, 0] = actions[:, :3]
 
         # clear actions for reset envs
         self.forces[reset_env_ids] = 0.0
@@ -543,9 +557,7 @@ def compute_quadcopter_reward(
 
     # combined reward
     # uprigness and spinning only matter when close to the target
-    reward = pos_reward + pos_reward * up_reward + spinnage_reward + vel_reward
-    # reward = pos_reward + up_reward + spinnage_reward
-    # reward = pos_reward + up_reward + pos_reward * spinnage_reward
+    reward = pos_reward + pos_reward * (up_reward + spinnage_reward + vel_reward)
 
     wandb.log(
         {
@@ -554,6 +566,7 @@ def compute_quadcopter_reward(
             "up_reward": up_reward.mean().item(),
             "spinnage_reward": spinnage_reward.mean().item(),
             "vel_reward": vel_reward.mean().item(),
+            "target_dist": target_dist[0].item(),
         }
     )
 

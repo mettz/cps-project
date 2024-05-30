@@ -37,9 +37,9 @@ class Controller:
 
         # Proportional gain matrix
         self.P = torch.zeros((self.num_envs, 3, 3), device=device, dtype=torch.float32)
-        self.P[:, 0, 0] = 50
-        self.P[:, 1, 1] = 50
-        self.P[:, 2, 2] = 50
+        self.P[:, 0, 0] = 5
+        self.P[:, 1, 1] = 5
+        self.P[:, 2, 2] = 5
 
         # Inertia matrix
         self.J = torch.zeros((self.num_envs, 3, 3), device=device, dtype=torch.float32)

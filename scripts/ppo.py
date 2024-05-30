@@ -144,6 +144,8 @@ def main():
     cfg["experiment"]["checkpoint_interval"] = 200
     cfg["experiment"]["directory"] = "runs/torch/Quadcopter"
 
+    cfg["experiment"]["wandb"] = True  # enable wandb logging
+
     agent = PPO(
         models=models,
         memory=memory,
@@ -154,7 +156,7 @@ def main():
     )
 
     # configure and instantiate the RL trainer
-    cfg_trainer = {"timesteps": 8000, "headless": False}
+    cfg_trainer = {"timesteps": 8000, "headless": True}
     trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
     wandb.init(
@@ -171,7 +173,7 @@ def main():
     trainer.train()
 
     # save the model
-    agent.save("agent.pt")
+    agent.save("agent_pos_and_vel_reward.pt")
 
     wandb.finish()
 
