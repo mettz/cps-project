@@ -17,7 +17,7 @@ assets:
 
 # if given, will override the device setting in gym. 
 env:
-  numEnvs: 200
+  numEnvs: 16
   envSpacing: 5.0
   maxEpisodeLength: 500
   enableDebugVis: False
@@ -27,13 +27,10 @@ env:
   clipObservations: 5.0
   clipActions: 1.0
 
-  # set to True if you use camera sensors in the environment
-  enableCameraSensors: False
-
   image:
     resolution:
-      width: 480
-      height: 270
+      width: 120
+      height: 67
 
 sim:
   dt: 0.01

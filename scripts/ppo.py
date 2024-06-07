@@ -13,11 +13,18 @@ from skrl.resources.schedulers.torch import KLAdaptiveRL
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
-from cps_project.tasks.quadrotor import Quadrotor
+from cps_project.tasks.quadrotor_cameras import Quadrotor
 import yaml
 import os
 import argparse
 import wandb
+
+import cv2
+import os
+from os import getcwd
+import numpy as np
+
+from torch.autograd import Variable
 
 # seed for reproducibility
 set_seed()  # e.g. `set_seed(42)` for fixed seed
@@ -42,19 +49,42 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         )
         DeterministicMixin.__init__(self, clip_actions)
 
-        self.net = nn.Sequential(
-            nn.Linear(self.num_observations, 256),
-            nn.ELU(),
-            nn.Linear(256, 256),
-            nn.ELU(),
-            nn.Linear(256, 128),
-            nn.ELU(),
+        # self.net = nn.Sequential(
+        #     nn.Linear(self.num_observations, 256),
+        #     nn.ELU(),
+        #     nn.Linear(256, 256),
+        #     nn.ELU(),
+        #     nn.Linear(256, 128),
+        #     nn.ELU(),
+        # )
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1,
+                out_channels=16,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=16,
+                out_channels=32,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
         )
 
-        self.mean_layer = nn.Linear(128, self.num_actions)
+        self.mean_layer = nn.Linear(32 * (67 // 4) * (120 // 4), self.num_actions)
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
 
-        self.value_layer = nn.Linear(128, 1)
+        self.value_layer = nn.Linear(32 * (67 // 4) * (120 // 4), 1)
 
     def act(self, inputs, role):
         if role == "policy":
@@ -63,14 +93,27 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
             return DeterministicMixin.act(self, inputs, role)
 
     def compute(self, inputs, role):
+        # view (samples, width * height * channels) -> (samples, width, height, channels)
+        # permute (samples, width, height, channels) -> (samples, channels, width, height)
+        x = inputs["states"].view(-1, 67, 120)
+        x = x.unsqueeze(1)
+        x.permute(0, 1, 3, 2)
+
+        x = self.conv1(x)
+        print(x.shape)
+        x = self.conv2(x)
+        print(x.shape)
+        x = x.view(x.size(0), -1)  # flatten the output of the conv layers
+        print(x.shape)
+
         if role == "policy":
             return (
-                self.mean_layer(self.net(inputs["states"])),
+                self.mean_layer(x),
                 self.log_std_parameter,
                 {},
             )
         elif role == "value":
-            return self.value_layer(self.net(inputs["states"])), {}
+            return self.value_layer(x), {}
 
 
 def main():
