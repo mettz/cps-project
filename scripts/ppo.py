@@ -13,7 +13,7 @@ from skrl.resources.schedulers.torch import KLAdaptiveRL
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
-from cps_project.tasks.quadrotor import Quadrotor
+from cps_project.tasks.quadrotor_cameras import Quadrotor
 import yaml
 import os
 import argparse
