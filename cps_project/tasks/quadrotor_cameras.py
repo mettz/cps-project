@@ -8,6 +8,10 @@ from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
 from cps_project.utils.controller import Controller
+import cv2
+
+import os
+from os import getcwd
 
 TARGET_X = 2.5
 TARGET_Y = 2.5
@@ -537,7 +541,19 @@ class Quadrotor(VecTask):
             self.envs.append(env)
 
     def compute_observations(self):
-        self.obs_buf = self.full_camera_array.view(self.num_envs, -1)
+        for env_id in range(self.num_envs):
+            self.obs_buf[env_id] = self.full_camera_array[env_id].view(-1)
+            # img = self.obs_buf[env_id].detach().cpu().numpy()
+            # img = img.reshape(self.image_res["height"], self.image_res["width"])
+            # img = img * 255
+            # img = img.astype(np.uint8)
+            # img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+
+            # # save image with cv2
+            # path = os.path.join(getcwd(), "img", f"{env_id}.png")
+            # print(f"saving image to {path}")
+            # cv2.imwrite(path, img)
+
         return self.obs_buf
 
     def compute_reward(self):
