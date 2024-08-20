@@ -30,6 +30,110 @@ from torch.autograd import Variable
 set_seed()  # e.g. `set_seed(42)` for fixed seed
 
 
+class Critic(DeterministicMixin, Model):
+    def __init__(
+        self,
+        drone_states_size,
+        observation_space,
+        action_space,
+        device,
+        clip_actions=False,
+        image_resolution=None,
+    ):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+
+        self.image_resolution = image_resolution
+
+        self.net = nn.Sequential(
+            nn.Linear(drone_states_size, 256),
+            nn.ELU(),
+            nn.Linear(256, 256),
+            nn.ELU(),
+            nn.Linear(256, 128),
+            nn.ELU(),
+            nn.Linear(128, 1),
+        )
+
+    def compute(self, inputs, _):
+        # view (samples, width * height * channels) -> (samples, width, height, channels)
+        # permute (samples, width, height, channels) -> (samples, channels, width, height)
+        # (samples x width * height + 13) -> [(samples, 13), (samples, width, height, channels)]
+
+        split_index = self.image_resolution["height"] * self.image_resolution["width"]
+        critic_x = inputs["states"][:, split_index:]
+
+        return self.net(critic_x), {}
+
+
+class Actor(GaussianMixin, Model):
+    def __init__(
+        self,
+        observation_space,
+        action_space,
+        device,
+        image_resolution,
+        clip_actions=False,
+        clip_log_std=True,
+        min_log_std=-20,
+        max_log_std=2,
+        reduction="sum",
+    ):
+        Model.__init__(self, observation_space, action_space, device)
+        GaussianMixin.__init__(
+            self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction
+        )
+
+        self.image_resolution = image_resolution
+
+        self.actor_net = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1,
+                out_channels=16,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(
+                in_channels=16,
+                out_channels=32,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            # 67 is the height of the image, 120 is the width
+            nn.Linear(
+                32
+                * (self.image_resolution["height"] // 4)
+                * (self.image_resolution["width"] // 4),
+                self.num_actions,
+            ),
+        )
+
+        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+
+    def compute(self, inputs, role):
+        # view (samples, width * height * channels) -> (samples, width, height, channels)
+        # permute (samples, width, height, channels) -> (samples, channels, width, height)
+        # (samples x width * height + 13) -> [(samples, width, height, channels), (samples, 13)]
+
+        split_index = self.image_resolution["height"] * self.image_resolution["width"]
+        image_tensor = inputs["states"][:, 0:split_index]
+
+        actor_x = image_tensor.view(
+            -1, self.image_resolution["height"], self.image_resolution["width"]
+        )
+        actor_x = actor_x.unsqueeze(1)
+        actor_x.permute(0, 1, 3, 2)
+
+        return (self.actor_net(actor_x), self.log_std_parameter, {})
+
+
 # define shared model (stochastic and deterministic models) using mixins
 class Shared(GaussianMixin, DeterministicMixin, Model):
     def __init__(
@@ -37,6 +141,8 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         observation_space,
         action_space,
         device,
+        image_resolution,
+        drone_states_size,
         clip_actions=False,
         clip_log_std=True,
         min_log_std=-20,
@@ -49,16 +155,19 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         )
         DeterministicMixin.__init__(self, clip_actions)
 
-        # self.net = nn.Sequential(
-        #     nn.Linear(self.num_observations, 256),
-        #     nn.ELU(),
-        #     nn.Linear(256, 256),
-        #     nn.ELU(),
-        #     nn.Linear(256, 128),
-        #     nn.ELU(),
-        # )
+        self.image_resolution = image_resolution
 
-        self.conv1 = nn.Sequential(
+        self.critic_net = nn.Sequential(
+            nn.Linear(drone_states_size, 256),
+            nn.ELU(),
+            nn.Linear(256, 256),
+            nn.ELU(),
+            nn.Linear(256, 128),
+            nn.ELU(),
+            nn.Linear(128, 1),
+        )
+
+        self.actor_net = nn.Sequential(
             nn.Conv2d(
                 in_channels=1,
                 out_channels=16,
@@ -68,8 +177,6 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
             ),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
-        )
-        self.conv2 = nn.Sequential(
             nn.Conv2d(
                 in_channels=16,
                 out_channels=32,
@@ -79,12 +186,17 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
             ),
             nn.ReLU(),
             nn.MaxPool2d(2),
+            nn.Flatten(),
+            # 67 is the height of the image, 120 is the width
+            nn.Linear(
+                32
+                * (self.image_resolution["height"] // 4)
+                * (self.image_resolution["width"] // 4),
+                self.num_actions,
+            ),
         )
 
-        self.mean_layer = nn.Linear(32 * (67 // 4) * (120 // 4), self.num_actions)
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-
-        self.value_layer = nn.Linear(32 * (67 // 4) * (120 // 4), 1)
 
     def act(self, inputs, role):
         if role == "policy":
@@ -95,25 +207,30 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
     def compute(self, inputs, role):
         # view (samples, width * height * channels) -> (samples, width, height, channels)
         # permute (samples, width, height, channels) -> (samples, channels, width, height)
-        x = inputs["states"].view(-1, 67, 120)
-        x = x.unsqueeze(1)
-        x.permute(0, 1, 3, 2)
+        # (samples x width * height + 13) -> [(samples, 13), (samples, width, height, channels)]
 
-        x = self.conv1(x)
-        print(x.shape)
-        x = self.conv2(x)
-        print(x.shape)
-        x = x.view(x.size(0), -1)  # flatten the output of the conv layers
-        print(x.shape)
+        split_index = self.image_resolution["height"] * self.image_resolution["width"]
+        image_tensor = inputs["states"][:, 0:split_index]
+        critic_x = inputs["states"][:, split_index:]
+
+        actor_x = image_tensor.view(
+            -1, self.image_resolution["height"], self.image_resolution["width"]
+        )
+        actor_x = actor_x.unsqueeze(1)
+        actor_x.permute(0, 1, 3, 2)
+
+        # x = self.conv1(x)
+        # x = self.conv2(x)
+        # x = x.view(x.size(0), -1)  # flatten the output of the conv layers
 
         if role == "policy":
             return (
-                self.mean_layer(x),
+                self.actor_net(actor_x),
                 self.log_std_parameter,
                 {},
             )
         elif role == "value":
-            return self.value_layer(x), {}
+            return self.critic_net(critic_x), {}
 
 
 def main():
@@ -143,6 +260,8 @@ def main():
         force_render=True,
     )
 
+    drone_states_size = 13
+
     env = wrap_env(task)
 
     device = env.device
@@ -154,8 +273,22 @@ def main():
     # PPO requires 2 models, visit its documentation for more details
     # https://skrl.readthedocs.io/en/latest/api/agents/ppo.html#models
     models = {}
-    models["policy"] = Shared(env.observation_space, env.action_space, device)
-    models["value"] = models["policy"]  # same instance: shared model
+    # 13 is the size of the state of the drone because: positions x-y-z (3) + orientation quaternion (4) + velocity x-y-z (3) + angular velocity x-y-z (3)
+    models["policy"] = Actor(
+        env.observation_space,
+        env.action_space,
+        device,
+        image_resolution=cfg["env"]["image"]["resolution"],
+    )
+    # models["value"] = models["policy"]  # same instance: shared model
+    models["value"] = Critic(
+        drone_states_size,
+        env.observation_space,
+        env.action_space,
+        device,
+        clip_actions=False,
+        image_resolution=cfg["env"]["image"]["resolution"],
+    )
 
     # configure and instantiate the agent (visit its documentation to see all the options)
     # https://skrl.readthedocs.io/en/latest/api/agents/ppo.html#configuration-and-hyperparameters
@@ -202,36 +335,36 @@ def main():
     cfg_trainer = {"timesteps": 8000, "headless": True}
     trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="cps-project",
-        # track hyperparameters and run metadata
-        config={
-            "learning_rate": cfg["learning_rate"],
-            "epochs": cfg["learning_epochs"],
-        },
-    )
+    # wandb.init(
+    #     # set the wandb project where this run will be logged
+    #     project="cps-project",
+    #     # track hyperparameters and run metadata
+    #     config={
+    #         "learning_rate": cfg["learning_rate"],
+    #         "epochs": cfg["learning_epochs"],
+    #     },
+    # )
 
     # start training
-    trainer.train()
+    # trainer.train()
 
     # save the model
     agent.save("agent_pos_and_vel_reward.pt")
 
-    wandb.finish()
+    # wandb.finish()
 
-    # # ---------------------------------------------------------
-    # # comment the code above: `trainer.train()`, and...
-    # # uncomment the following lines to evaluate a trained agent
-    # # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # comment the code above: `trainer.train()`, and...
+    # uncomment the following lines to evaluate a trained agent
+    # ---------------------------------------------------------
     # from skrl.utils.huggingface import download_model_from_huggingface
 
     # # download the trained agent's checkpoint from Hugging Face Hub and load it
     # path = download_model_from_huggingface("skrl/IsaacGymEnvs-Quadcopter-PPO", filename="agent.pt")
-    # agent.load("agent.pt")
+    agent.load("agent_pos_and_vel_reward.pt")
 
-    # # start evaluation
-    # trainer.eval()
+    # start evaluation
+    trainer.eval()
 
 
 if __name__ == "__main__":

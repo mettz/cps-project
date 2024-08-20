@@ -42,9 +42,10 @@ class Quadrotor(VecTask):
             else gymapi.IMAGE_COLOR
         )
         self.image_res = self.image_cfg["resolution"]
+        self.flatten_image_sz = self.image_res["width"] * self.image_res["height"]
 
-        # Observations: depth camera image
-        num_obs = self.image_res["width"] * self.image_res["height"]
+        # Observations: depth camera image flatten + 13 drone states
+        num_obs = self.flatten_image_sz + 13
 
         # Actions:
         # 0. Roll
@@ -189,7 +190,7 @@ class Quadrotor(VecTask):
         positions = torch.rand(
             len(env_ids), self.cfg["env"]["numObstacles"], 3, device=self.device
         )
-        print("randomizing positions of obstacles")
+        # print("randomizing positions of obstacles")
 
         positions[:, :, 0] = positions[:, :, 0] * 10 - 5
         positions[:, :, 1] = positions[:, :, 1] * 5
@@ -219,8 +220,8 @@ class Quadrotor(VecTask):
     def pre_physics_step(self, _actions):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
-            print("resetting envs")
-            print(reset_env_ids)
+            # print("resetting envs")
+            # print(reset_env_ids)
             self.reset_idx(reset_env_ids)
 
         actions = _actions.to(self.device)
@@ -246,9 +247,14 @@ class Quadrotor(VecTask):
             * self.root_linear_velocities[:, 0] ** 2
         )
 
-        # self.forces[:, 0] += friction
+        self.forces[:, 0] += friction
         self.forces[:, 0, 2] = common_thrust
         self.torques[:, 0] = total_torque
+
+        # No controller
+        # self.forces[:, 0] += actions[:, 0:3]
+        # self.torques[:, 0, 2] = actions[:, 3]
+
         wandb.log(
             {
                 "thrust": common_thrust[0].item(),
@@ -542,7 +548,10 @@ class Quadrotor(VecTask):
 
     def compute_observations(self):
         for env_id in range(self.num_envs):
-            self.obs_buf[env_id] = self.full_camera_array[env_id].view(-1)
+            self.obs_buf[env_id, 0 : self.flatten_image_sz] = self.full_camera_array[
+                env_id
+            ].view(-1)
+            self.obs_buf[env_id, self.flatten_image_sz :] = self.root_states[env_id, 0]
             # img = self.obs_buf[env_id].detach().cpu().numpy()
             # img = img.reshape(self.image_res["height"], self.image_res["width"])
             # img = img * 255
@@ -607,6 +616,7 @@ def compute_quadcopter_reward(
     # combined reward
     # uprigness and spinning only matter when close to the target
     reward = pos_reward + pos_reward * (up_reward + spinnage_reward + vel_reward)
+    # reward = pos_reward
 
     wandb.log(
         {
@@ -625,13 +635,19 @@ def compute_quadcopter_reward(
     # die = torch.where(target_dist > 3.0, ones, die)
 
     die = torch.where(root_positions[:, 2] < 0.1, ones, die)
+    # die = torch.where(
+    #     target_dist > 3.5,
+    #     ones,
+    #     die,
+    # )
+
     die = torch.where(
-        target_dist > 3.5,
+        root_positions[..., 2] > 5,
         ones,
         die,
     )
 
     # resets due to episode length
-    reset = torch.where(progress_buf >= max_episode_length - 1, ones, die)
+    reset = torch.where(progress_buf >= max_episode_length // 2 - 1, ones, die)
 
     return reward, reset
