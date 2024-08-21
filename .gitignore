@@ -166,3 +166,5 @@ cython_debug/
 resources/skrl/runs
 runs
 wandb
+*.pt
+img

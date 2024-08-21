@@ -7,7 +7,7 @@ import torch
 from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
-from cps_project.utils.controller import Controller
+from cps_project.controller import Controller
 import cv2
 
 import os

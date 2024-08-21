@@ -7,7 +7,7 @@ import torch
 from isaacgymenvs.utils.torch_jit_utils import *
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
-from cps_project.utils.controller import Controller
+from cps_project.controller import Controller
 
 TARGET_X = 2.5
 TARGET_Y = 2.5
