@@ -44,8 +44,8 @@ Indice presentazione:
     - Schreenshot ambiente con ostacoli e drone
  
 4. Focus su SKRL con drone in hovering: MAT
-    - Schema a blocchi su come definire un modello NN con SKRL e come trainarlo in Isaac (reset ambiente se cade) (1 slide)
-    - Spiegare controllore (1 slide)
+    - Schema a blocchi su come è stato implementato il task di hovering (1 slide)
+    - Spiegare come è stato definito il modello NN per il task di hovering (1 slide)
     - Spiegazione definizione reward function per hovering (1 slide)
     - Video drone in hovering su target palla gialla
     - Spiegare wandb e mettere screenshots (1 slide)
