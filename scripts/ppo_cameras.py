@@ -4,7 +4,6 @@ import torch.nn as nn
 
 # import the skrl components to build the RL system
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
-from skrl.envs.loaders.torch import load_isaacgym_env_preview4
 from skrl.envs.wrappers.torch import wrap_env
 from skrl.memories.torch import RandomMemory
 from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
@@ -13,18 +12,10 @@ from skrl.resources.schedulers.torch import KLAdaptiveRL
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
-from cps_project.tasks.quadrotor_cameras import Quadrotor
+from cps_project.tasks.quadrotor import Quadrotor
 import yaml
 import os
 import argparse
-import wandb
-
-import cv2
-import os
-from os import getcwd
-import numpy as np
-
-from torch.autograd import Variable
 
 # seed for reproducibility
 set_seed()  # e.g. `set_seed(42)` for fixed seed
@@ -132,105 +123,6 @@ class Actor(GaussianMixin, Model):
         actor_x.permute(0, 1, 3, 2)
 
         return (self.actor_net(actor_x), self.log_std_parameter, {})
-
-
-# define shared model (stochastic and deterministic models) using mixins
-class Shared(GaussianMixin, DeterministicMixin, Model):
-    def __init__(
-        self,
-        observation_space,
-        action_space,
-        device,
-        image_resolution,
-        drone_states_size,
-        clip_actions=False,
-        clip_log_std=True,
-        min_log_std=-20,
-        max_log_std=2,
-        reduction="sum",
-    ):
-        Model.__init__(self, observation_space, action_space, device)
-        GaussianMixin.__init__(
-            self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction
-        )
-        DeterministicMixin.__init__(self, clip_actions)
-
-        self.image_resolution = image_resolution
-
-        self.critic_net = nn.Sequential(
-            nn.Linear(drone_states_size, 256),
-            nn.ELU(),
-            nn.Linear(256, 256),
-            nn.ELU(),
-            nn.Linear(256, 128),
-            nn.ELU(),
-            nn.Linear(128, 1),
-        )
-
-        self.actor_net = nn.Sequential(
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=16,
-                kernel_size=5,
-                stride=1,
-                padding=2,
-            ),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(
-                in_channels=16,
-                out_channels=32,
-                kernel_size=5,
-                stride=1,
-                padding=2,
-            ),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Flatten(),
-            # 67 is the height of the image, 120 is the width
-            nn.Linear(
-                32
-                * (self.image_resolution["height"] // 4)
-                * (self.image_resolution["width"] // 4),
-                self.num_actions,
-            ),
-        )
-
-        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-
-    def act(self, inputs, role):
-        if role == "policy":
-            return GaussianMixin.act(self, inputs, role)
-        elif role == "value":
-            return DeterministicMixin.act(self, inputs, role)
-
-    def compute(self, inputs, role):
-        # view (samples, width * height * channels) -> (samples, width, height, channels)
-        # permute (samples, width, height, channels) -> (samples, channels, width, height)
-        # (samples x width * height + 13) -> [(samples, 13), (samples, width, height, channels)]
-
-        split_index = self.image_resolution["height"] * self.image_resolution["width"]
-        image_tensor = inputs["states"][:, 0:split_index]
-        critic_x = inputs["states"][:, split_index:]
-
-        actor_x = image_tensor.view(
-            -1, self.image_resolution["height"], self.image_resolution["width"]
-        )
-        actor_x = actor_x.unsqueeze(1)
-        actor_x.permute(0, 1, 3, 2)
-
-        # x = self.conv1(x)
-        # x = self.conv2(x)
-        # x = x.view(x.size(0), -1)  # flatten the output of the conv layers
-
-        if role == "policy":
-            return (
-                self.actor_net(actor_x),
-                self.log_std_parameter,
-                {},
-            )
-        elif role == "value":
-            return self.critic_net(critic_x), {}
 
 
 def main():

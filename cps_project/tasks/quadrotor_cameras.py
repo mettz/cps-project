@@ -93,14 +93,6 @@ class Quadrotor(VecTask):
 
         self.initial_root_states = vec_root_tensor.clone()
 
-        max_thrust = 2
-        self.thrust_lower_limits = torch.zeros(
-            4, device=self.device, dtype=torch.float32
-        )
-        self.thrust_upper_limits = max_thrust * torch.ones(
-            4, device=self.device, dtype=torch.float32
-        )
-
         self.forces = torch.zeros(
             (self.num_envs, self.actors_per_env, 3),
             dtype=torch.float32,
@@ -115,17 +107,7 @@ class Quadrotor(VecTask):
         )
 
         self.controller = Controller(self.num_envs, self.device)
-
-        self.all_actor_indices = torch.tensor(
-            (self.num_envs, self.actors_per_env),
-            dtype=torch.int32,
-            device=self.device,
-        )
-
         self.target_dist = torch.zeros(self.num_envs, device=self.device)
-
-        self.real_thrust_upbound = torch.tensor([0.6], device=self.device)
-        self.real_thrust_lowbound = torch.tensor([0.0], device=self.device)
 
         if self.camera_type == gymapi.IMAGE_DEPTH:
             self.full_camera_array = torch.zeros(

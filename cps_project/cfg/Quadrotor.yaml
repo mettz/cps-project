@@ -8,12 +8,6 @@ assets:
 
   quadrotor:
     file: "robots/quad/crazyflie2.urdf" # this is relative to assets.path
-    name: "aerial_robot"  # actor name
-    base_link_name: "base_link"
-    options:
-      fix_base_link: False  # fix the base of the robot.  
-      angular_damping: 0.0
-      max_angular_velocity: 100.0
 
 # if given, will override the device setting in gym. 
 env:
