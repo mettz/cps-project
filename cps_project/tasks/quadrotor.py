@@ -28,13 +28,13 @@ class Quadrotor(VecTask):
         headless,
         virtual_screen_capture,
         force_render,
+        num_obs=None,
     ):
         self.cfg = cfg
 
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
 
-        self.image_cfg = self.cfg["env"]["image"]
         self.assets_path = self.cfg["assets"]["path"]
 
         # Observations correspondds to the quadrotor's state vector:
@@ -42,17 +42,14 @@ class Quadrotor(VecTask):
         # 2. quadrotor orientation as a quaternion (x, y, z, w)
         # 3. quadrotor linear velocity (Vx, Vy, Vz)
         # 4. quadrotor angular velocity (ωx, ωy, ωz)
-        num_obs = 13
+        self.cfg["env"]["numObservations"] = 13 if num_obs is None else num_obs
 
         # Actions:
         # 0. Roll
         # 1. Pitch
         # 2. Yaw
         # 3. Common thrust
-        num_actions = 4
-
-        self.cfg["env"]["numObservations"] = num_obs
-        self.cfg["env"]["numActions"] = num_actions
+        self.cfg["env"]["numActions"] = 4
 
         super().__init__(
             cfg,
@@ -66,7 +63,8 @@ class Quadrotor(VecTask):
 
         # self.actors is populated with the actors of the environment when the self.create_sim()
         # method is called which happens in the super().__init__() call
-        self.actors_per_env = len(self.actors) // self.num_envs
+        self.actors_per_env = len(self.actors[0])
+        print(f"actors per env: {self.actors_per_env}")
 
         self.root_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
         self.contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
@@ -109,6 +107,7 @@ class Quadrotor(VecTask):
         self.target_tensor = torch.tensor(
             [TARGET_X, TARGET_Y, TARGET_Z], device=self.device
         )
+        self.compute_quadcopter_reward_fn = compute_quadcopter_reward
 
         self.controller = Controller(self.num_envs, self.device)
 
@@ -143,15 +142,6 @@ class Quadrotor(VecTask):
         self.root_states[env_ids, 0, 7:10] = 0.0
         self.root_states[env_ids, 0, 10:13] = 0.0
 
-        self.gym.set_actor_root_state_tensor(
-            self.sim,
-            self.root_tensor,
-        )
-
-        # clear progress and reset buffers to prepare for the next episode
-        self.reset_buf[env_ids] = 0
-        self.progress_buf[env_ids] = 0
-
     def check_collisions(self):
         ones = torch.ones((self.num_envs), device=self.device)
         zeros = torch.zeros((self.num_envs), device=self.device)
@@ -171,6 +161,15 @@ class Quadrotor(VecTask):
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
             self.reset_idx(reset_env_ids)
+            self.gym.set_actor_root_state_tensor(
+                self.sim,
+                self.root_tensor,
+            )
+
+            # clear progress and reset buffers to prepare for
+            # the next episode
+            self.reset_buf[reset_env_ids] = 0
+            self.progress_buf[reset_env_ids] = 0
 
         actions = _actions.to(self.device)
         wandb.log(
@@ -189,14 +188,13 @@ class Quadrotor(VecTask):
             self.root_linear_velocities[:, 0],
         )
 
-        # TODO: Add friction ??????????????????????????????????????????????????????????????????
         friction = (
             -0.5
             * torch.sign(self.root_linear_velocities[:, 0])
             * self.root_linear_velocities[:, 0] ** 2
         )
 
-        # self.forces[:, 0] += friction
+        self.forces[:, 0] += friction
         self.forces[:, 0, 2] = common_thrust
         self.torques[:, 0] = total_torque
         wandb.log(
@@ -212,6 +210,7 @@ class Quadrotor(VecTask):
         self.forces[reset_env_ids] = 0.0
         self.torques[reset_env_ids] = 0.0
 
+        # apply actions
         self.gym.apply_rigid_body_force_tensors(
             self.sim,
             gymtorch.unwrap_tensor(self.forces),
@@ -287,6 +286,7 @@ class Quadrotor(VecTask):
 
         self.envs = []
         self.actors = []
+        self.quads = []
 
         wall_color = gymapi.Vec3(100 / 255, 200 / 255, 210 / 255)
         sphere_color = gymapi.Vec3(200 / 255, 210 / 255, 100 / 255)
@@ -295,6 +295,7 @@ class Quadrotor(VecTask):
             env = self.gym.create_env(
                 self.sim, self.env_lower_bound, self.env_upper_bound, envs_per_row
             )
+            self.actors.append([])
             quad = self.gym.create_actor(
                 env,
                 quad_asset,
@@ -304,7 +305,7 @@ class Quadrotor(VecTask):
                 1,
                 0,  # collision group
             )
-            self.actors.append(quad)
+            self.actors[i].append(quad)
 
             left_wall = self.gym.create_actor(
                 env,
@@ -395,11 +396,11 @@ class Quadrotor(VecTask):
                 sphere_color,
             )
 
-            self.actors.append(small_sphere)
-            self.actors.append(left_wall)
-            self.actors.append(right_wall)
-            self.actors.append(back_wall)
-            self.actors.append(front_wall)
+            self.actors[i].append(small_sphere)
+            self.actors[i].append(left_wall)
+            self.actors[i].append(right_wall)
+            self.actors[i].append(back_wall)
+            self.actors[i].append(front_wall)
 
             self.envs.append(env)
 
@@ -421,7 +422,7 @@ class Quadrotor(VecTask):
             vel_reward,
             target_dist,
             reset,
-        ) = compute_quadcopter_reward(
+        ) = self.compute_quadcopter_reward_fn(
             self.target_tensor,
             self.root_positions[..., 0, :],
             self.root_rotations[..., 0, :],

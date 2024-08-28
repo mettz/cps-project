@@ -12,7 +12,7 @@ from skrl.resources.schedulers.torch import KLAdaptiveRL
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
-from cps_project.tasks.quadrotor import Quadrotor
+from cps_project.tasks.quadrotor_cameras import QuadrotorCameras
 import yaml
 import os
 import argparse
@@ -142,7 +142,7 @@ def main():
     with open(cfg_path) as file:
         cfg = yaml.load(file, Loader=yaml.FullLoader)
 
-    task = Quadrotor(
+    task = QuadrotorCameras(
         cfg=cfg,
         rl_device="cuda:0",
         sim_device="cuda:0",
