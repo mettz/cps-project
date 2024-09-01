@@ -4,19 +4,11 @@ import numpy as np
 import yaml
 from isaacgym import gymutil
 import torch
-from skrl.envs.wrappers.torch import wrap_env
 
 from cps_project.tasks.quadrotor import Quadrotor
 
 
 def main():
-    # TODO: check why this is needed
-    """Setting seeds for random number generators is essential for reproducibility in computational experiments.
-    When random number generators are initialized with the same seed, they produce the same sequence of numbers
-    each time the code is run. This allows for consistent results, which is particularly important in machine learning and
-    reinforcement learning tasks where randomness plays a significant role."""
-    # direi che quindi in basic_env non serve
-
     seed = 1
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -41,14 +33,11 @@ def main():
             },
         ],
     )
-    # Open yaml file and read the configuration
 
-    # Combine the base directory with the relative path
+    # Open yaml file and read the configuration
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cfg_path = os.path.abspath(os.path.join(script_dir, args.config))
     print(f"Using configuration file: {cfg_path}")
-
-    # Get the absolute path by combining it with the current working directory
 
     with open(cfg_path) as file:
         cfg = yaml.load(file, Loader=yaml.FullLoader)
@@ -62,11 +51,6 @@ def main():
         virtual_screen_capture=False,
         force_render=True,
     )
-
-    # env = wrap_env(task)
-    # print("Environment created with device", env.device)
-
-    # print("Number of environments", task.num_envs)
 
     # these are the actions commanded to the drone
     command_actions = torch.zeros((task.num_envs, task.num_actions))

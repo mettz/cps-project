@@ -20,5 +20,7 @@ setup(
         "torch",
         "pytorch3d",
         "opencv-python",
+        "skrl==1.1.0",
+        "wandb",
     ],
 )

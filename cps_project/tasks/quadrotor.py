@@ -28,9 +28,11 @@ class Quadrotor(VecTask):
         headless,
         virtual_screen_capture,
         force_render,
+        wandb=False,
         num_obs=None,
     ):
         self.cfg = cfg
+        self.wandb = wandb
 
         self.max_episode_length = self.cfg["env"]["maxEpisodeLength"]
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
@@ -172,14 +174,15 @@ class Quadrotor(VecTask):
             self.progress_buf[reset_env_ids] = 0
 
         actions = _actions.to(self.device)
-        wandb.log(
-            {
-                "yaw_rate": actions[0, 3].item(),
-                "vel_x": actions[0, 0].item(),
-                "vel_y": actions[0, 1].item(),
-                "vel_z": actions[0, 2].item(),
-            }
-        )
+        if self.wandb:
+            wandb.log(
+                {
+                    "yaw_rate": actions[0, 3].item(),
+                    "vel_x": actions[0, 0].item(),
+                    "vel_y": actions[0, 1].item(),
+                    "vel_z": actions[0, 2].item(),
+                }
+            )
 
         total_torque, common_thrust = self.controller.update(
             actions,
@@ -197,14 +200,15 @@ class Quadrotor(VecTask):
         self.forces[:, 0] += friction
         self.forces[:, 0, 2] = common_thrust
         self.torques[:, 0] = total_torque
-        wandb.log(
-            {
-                "thrust": common_thrust[0].item(),
-                "torque_x": total_torque[0, 0].item(),
-                "torque_y": total_torque[0, 1].item(),
-                "torque_z": total_torque[0, 2].item(),
-            }
-        )
+        if self.wandb:
+            wandb.log(
+                {
+                    "thrust": common_thrust[0].item(),
+                    "torque_x": total_torque[0, 0].item(),
+                    "torque_y": total_torque[0, 1].item(),
+                    "torque_z": total_torque[0, 2].item(),
+                }
+            )
 
         # clear actions for reset envs
         self.forces[reset_env_ids] = 0.0
@@ -233,6 +237,160 @@ class Quadrotor(VecTask):
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
 
+    def _load_assets(self):
+        quad_cfg = self.cfg["assets"]["quadrotor"]
+        quad_file = quad_cfg["file"]
+
+        self.quad_asset = self.gym.load_asset(
+            self.sim, self.assets_path, quad_file, gymapi.AssetOptions()
+        )
+
+        wall_options = gymapi.AssetOptions()
+        wall_options.fix_base_link = True
+
+        self.left_wall_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/walls/left_wall.urdf",
+            wall_options,
+        )
+        self.right_wall_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/walls/right_wall.urdf",
+            wall_options,
+        )
+        self.front_wall_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/walls/front_wall.urdf",
+            wall_options,
+        )
+        self.back_wall_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/walls/back_wall.urdf",
+            wall_options,
+        )
+        self.small_sphere_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/objects/small_sphere.urdf",
+            wall_options,
+        )
+
+    def _create_env(self, env_id):
+        quad_start_pose = gymapi.Transform()
+        quad_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
+        quad = self.gym.create_actor(
+            self.envs[env_id],
+            self.quad_asset,
+            quad_start_pose,
+            "quadrotor",
+            env_id,
+            1,
+            0,  # collision group
+        )
+        self.actors[env_id].append(quad)
+
+        wall_color = gymapi.Vec3(100 / 255, 200 / 255, 210 / 255)
+
+        left_wall = self.gym.create_actor(
+            self.envs[env_id],
+            self.left_wall_asset,
+            gymapi.Transform(p=gymapi.Vec3(0.0, 0.0, 2.5)),
+            "left_wall",
+            env_id,
+            0,
+            8,
+        )
+        self.gym.set_rigid_body_color(
+            self.envs[env_id],
+            left_wall,
+            0,
+            gymapi.MESH_VISUAL,
+            wall_color,
+        )
+
+        right_wall = self.gym.create_actor(
+            self.envs[env_id],
+            self.right_wall_asset,
+            gymapi.Transform(p=gymapi.Vec3(0.0, 5.0, 2.5)),
+            "right_wall",
+            env_id,
+            0,
+            8,
+        )
+        self.gym.set_rigid_body_color(
+            self.envs[env_id],
+            right_wall,
+            0,
+            gymapi.MESH_VISUAL,
+            wall_color,
+        )
+
+        back_wall = self.gym.create_actor(
+            self.envs[env_id],
+            self.back_wall_asset,
+            gymapi.Transform(p=gymapi.Vec3(5.0, 2.5, 2.5)),
+            "back_wall",
+            env_id,
+            0,
+            8,
+        )
+        self.gym.set_rigid_body_color(
+            self.envs[env_id],
+            back_wall,
+            0,
+            gymapi.MESH_VISUAL,
+            wall_color,
+        )
+
+        front_wall = self.gym.create_actor(
+            self.envs[env_id],
+            self.front_wall_asset,
+            gymapi.Transform(p=gymapi.Vec3(-5.0, 2.5, 2.5)),
+            "front_wall",
+            env_id,
+            0,
+            8,
+        )
+
+        self.gym.set_rigid_body_color(
+            self.envs[env_id],
+            front_wall,
+            0,
+            gymapi.MESH_VISUAL,
+            wall_color,
+        )
+
+        sphere_pose = gymapi.Transform()
+        sphere_pose.p = gymapi.Vec3(TARGET_X, TARGET_Y, TARGET_Z)
+        small_sphere = self.gym.create_actor(
+            self.envs[env_id],
+            self.small_sphere_asset,
+            sphere_pose,
+            "small_sphere",
+            env_id,
+            0,
+            0,
+        )
+
+        sphere_color = gymapi.Vec3(200 / 255, 210 / 255, 100 / 255)
+        self.gym.set_rigid_body_color(
+            self.envs[env_id],
+            small_sphere,
+            0,
+            gymapi.MESH_VISUAL,
+            sphere_color,
+        )
+
+        self.actors[env_id].append(small_sphere)
+        self.actors[env_id].append(left_wall)
+        self.actors[env_id].append(right_wall)
+        self.actors[env_id].append(back_wall)
+        self.actors[env_id].append(front_wall)
+
     def _create_envs(self):
         spacing = self.cfg["env"]["envSpacing"]
         envs_per_row = int(np.sqrt(self.num_envs))
@@ -240,169 +398,19 @@ class Quadrotor(VecTask):
         self.env_lower_bound = gymapi.Vec3(-spacing, -spacing, 0.0)
         self.env_upper_bound = gymapi.Vec3(spacing, spacing, spacing)
 
-        quad_cfg = self.cfg["assets"]["quadrotor"]
-        quad_file = quad_cfg["file"]
-
-        quad_asset = self.gym.load_asset(
-            self.sim, self.assets_path, quad_file, gymapi.AssetOptions()
-        )
-        quad_start_pose = gymapi.Transform()
-        quad_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
-
-        wall_options = gymapi.AssetOptions()
-        wall_options.fix_base_link = True
-
-        left_wall_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/walls/left_wall.urdf",
-            wall_options,
-        )
-        right_wall_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/walls/right_wall.urdf",
-            wall_options,
-        )
-        front_wall_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/walls/front_wall.urdf",
-            wall_options,
-        )
-        back_wall_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/walls/back_wall.urdf",
-            wall_options,
-        )
-
-        small_sphere_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/objects/small_sphere.urdf",
-            wall_options,
-        )
-
         self.envs = []
         self.actors = []
         self.quads = []
 
-        wall_color = gymapi.Vec3(100 / 255, 200 / 255, 210 / 255)
-        sphere_color = gymapi.Vec3(200 / 255, 210 / 255, 100 / 255)
+        self._load_assets()
 
         for i in range(self.num_envs):
             env = self.gym.create_env(
                 self.sim, self.env_lower_bound, self.env_upper_bound, envs_per_row
             )
             self.actors.append([])
-            quad = self.gym.create_actor(
-                env,
-                quad_asset,
-                quad_start_pose,
-                "quadrotor",
-                i,
-                1,
-                0,  # collision group
-            )
-            self.actors[i].append(quad)
-
-            left_wall = self.gym.create_actor(
-                env,
-                left_wall_asset,
-                gymapi.Transform(p=gymapi.Vec3(0.0, 0.0, 2.5)),
-                "left_wall",
-                i,
-                0,
-                8,
-            )
-            self.gym.set_rigid_body_color(
-                env,
-                left_wall,
-                0,
-                gymapi.MESH_VISUAL,
-                wall_color,
-            )
-
-            right_wall = self.gym.create_actor(
-                env,
-                right_wall_asset,
-                gymapi.Transform(p=gymapi.Vec3(0.0, 5.0, 2.5)),
-                "right_wall",
-                i,
-                0,
-                8,
-            )
-            self.gym.set_rigid_body_color(
-                env,
-                right_wall,
-                0,
-                gymapi.MESH_VISUAL,
-                wall_color,
-            )
-
-            back_wall = self.gym.create_actor(
-                env,
-                back_wall_asset,
-                gymapi.Transform(p=gymapi.Vec3(5.0, 2.5, 2.5)),
-                "back_wall",
-                i,
-                0,
-                8,
-            )
-            self.gym.set_rigid_body_color(
-                env,
-                back_wall,
-                0,
-                gymapi.MESH_VISUAL,
-                wall_color,
-            )
-
-            front_wall = self.gym.create_actor(
-                env,
-                front_wall_asset,
-                gymapi.Transform(p=gymapi.Vec3(-5.0, 2.5, 2.5)),
-                "front_wall",
-                i,
-                0,
-                8,
-            )
-
-            self.gym.set_rigid_body_color(
-                env,
-                front_wall,
-                0,
-                gymapi.MESH_VISUAL,
-                wall_color,
-            )
-
-            sphere_pose = gymapi.Transform()
-            sphere_pose.p = gymapi.Vec3(TARGET_X, TARGET_Y, TARGET_Z)
-            small_sphere = self.gym.create_actor(
-                env,
-                small_sphere_asset,
-                sphere_pose,
-                "small_sphere",
-                i,
-                0,
-                0,
-            )
-
-            self.gym.set_rigid_body_color(
-                env,
-                small_sphere,
-                0,
-                gymapi.MESH_VISUAL,
-                sphere_color,
-            )
-
-            self.actors[i].append(small_sphere)
-            self.actors[i].append(left_wall)
-            self.actors[i].append(right_wall)
-            self.actors[i].append(back_wall)
-            self.actors[i].append(front_wall)
-
             self.envs.append(env)
+            self._create_env(i)
 
     def compute_observations(self):
         self.obs_buf[..., 0] = (TARGET_X - self.root_positions[..., 0, 0]) / 3
@@ -436,16 +444,17 @@ class Quadrotor(VecTask):
         self.rew_buf = reward
         self.reset_buf = reset
 
-        wandb.log(
-            {
-                "reward": reward.mean().item(),
-                "pos_reward": pos_reward.mean().item(),
-                "up_reward": up_reward.mean().item(),
-                "spinnage_reward": spinnage_reward.mean().item(),
-                "vel_reward": vel_reward.mean().item(),
-                "target_dist": target_dist[0].item(),
-            }
-        )
+        if self.wandb:
+            wandb.log(
+                {
+                    "reward": reward.mean().item(),
+                    "pos_reward": pos_reward.mean().item(),
+                    "up_reward": up_reward.mean().item(),
+                    "spinnage_reward": spinnage_reward.mean().item(),
+                    "vel_reward": vel_reward.mean().item(),
+                    "target_dist": target_dist[0].item(),
+                }
+            )
 
 
 @torch.jit.script

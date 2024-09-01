@@ -79,6 +79,11 @@ def main():
         help="Path to the configuration file (relative to the script directory)",
         default="../cps_project/cfg/Quadrotor.yaml",
     )
+    parser.add_argument(
+        "--wandb",
+        help="Use Weights & Biases for logging",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -95,6 +100,7 @@ def main():
         headless=False,
         virtual_screen_capture=False,
         force_render=True,
+        wandb=args.wandb,
     )
 
     env = wrap_env(task)
@@ -134,7 +140,8 @@ def main():
     cfg["experiment"]["checkpoint_interval"] = 200
     cfg["experiment"]["directory"] = "runs/torch/Quadcopter"
 
-    cfg["experiment"]["wandb"] = True
+    if args.wandb:
+        cfg["experiment"]["wandb"] = True
 
     agent = PPO(
         models=models,
@@ -148,18 +155,20 @@ def main():
     cfg_trainer = {"timesteps": 8000, "headless": True}
     trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
-    wandb.init(
-        project="cps-project",
-        config={
-            "learning_rate": cfg["learning_rate"],
-            "epochs": cfg["learning_epochs"],
-        },
-    )
+    if args.wandb:
+        wandb.init(
+            project="cps-project",
+            config={
+                "learning_rate": cfg["learning_rate"],
+                "epochs": cfg["learning_epochs"],
+            },
+        )
 
     trainer.train()
     agent.save("ppo_hovering.pt")
 
-    wandb.finish()
+    if args.wandb:
+        wandb.finish()
 
     agent.load("ppo_hovering.pt")
     trainer.eval()

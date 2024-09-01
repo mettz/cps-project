@@ -107,8 +107,20 @@ class QuadrotorCameras(Quadrotor):
         self.render_cameras()
         super().post_physics_step()
 
-    def _create_envs(self):
-        super()._create_envs()
+    def _load_assets(self):
+        super()._load_assets()
+
+        cube_options = gymapi.AssetOptions()
+        cube_options.fix_base_link = True
+        self.cube_asset = self.gym.load_asset(
+            self.sim,
+            self.assets_path,
+            "obstacles/objects/small_cube.urdf",
+            cube_options,
+        )
+
+    def _create_env(self, env_id):
+        super()._create_env(env_id)
 
         # Set Camera Properties
         camera_props = gymapi.CameraProperties()
@@ -124,70 +136,58 @@ class QuadrotorCameras(Quadrotor):
         # orientation of the camera relative to the body
         local_transform.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
-        cube_options = gymapi.AssetOptions()
-        cube_options.fix_base_link = True
-
-        cube_asset = self.gym.load_asset(
-            self.sim,
-            self.assets_path,
-            "obstacles/objects/small_cube.urdf",
-            cube_options,
+        quad = self.actors[env_id][0]
+        cam = self.gym.create_camera_sensor(self.envs[env_id], camera_props)
+        self.gym.attach_camera_to_body(
+            cam,
+            self.envs[env_id],
+            quad,
+            local_transform,
+            gymapi.FOLLOW_TRANSFORM,
         )
 
+        camera_tensor = self.gym.get_camera_image_gpu_tensor(
+            self.sim,
+            self.envs[env_id],
+            cam,
+            # IMAGE_COLOR -> RGBA, IMAGE_DEPTH -> Depth
+            gymapi.IMAGE_DEPTH
+            if self.cfg["sim"]["camera"] == "depth"
+            else gymapi.IMAGE_COLOR,
+        )
+
+        torch_cam_tensor = gymtorch.wrap_tensor(camera_tensor)
+        self.camera_tensors.append(torch_cam_tensor)
+
+        self.cameras.append(cam)
+
+        for j in range(self.cfg["env"]["numObstacles"]):
+            cube = self.gym.create_actor(
+                self.envs[env_id],
+                self.cube_asset,
+                gymapi.Transform(p=gymapi.Vec3(0, 0, 0)),
+                f"cube{j}",
+                env_id,
+                0,
+                3,
+            )
+            color = np.random.randint(low=50, high=200, size=3)
+
+            self.gym.set_rigid_body_color(
+                self.envs[env_id],
+                cube,
+                0,
+                gymapi.MESH_VISUAL,
+                gymapi.Vec3(color[0] / 255, color[1] / 255, color[2] / 255),
+            )
+
+            self.actors[env_id].append(cube)
+
+    def _create_envs(self):
         self.cameras = []
         self.camera_tensors = []
 
-        for i in range(self.num_envs):
-            env = self.envs[i]
-            quad = self.actors[i][0]
-
-            cam = self.gym.create_camera_sensor(env, camera_props)
-            self.gym.attach_camera_to_body(
-                cam,
-                env,
-                quad,
-                local_transform,
-                gymapi.FOLLOW_TRANSFORM,
-            )
-
-            camera_tensor = self.gym.get_camera_image_gpu_tensor(
-                self.sim,
-                env,
-                cam,
-                # IMAGE_COLOR -> RGBA, IMAGE_DEPTH -> Depth
-                gymapi.IMAGE_DEPTH
-                if self.cfg["sim"]["camera"] == "depth"
-                else gymapi.IMAGE_COLOR,
-            )
-
-            torch_cam_tensor = gymtorch.wrap_tensor(camera_tensor)
-            self.camera_tensors.append(torch_cam_tensor)
-
-            self.cameras.append(cam)
-
-            for j in range(self.cfg["env"]["numObstacles"]):
-                cube = self.gym.create_actor(
-                    env,
-                    cube_asset,
-                    gymapi.Transform(p=gymapi.Vec3(0, 0, 0)),
-                    f"cube{j}",
-                    i,
-                    0,
-                    3,
-                )
-                color = np.random.randint(low=50, high=200, size=3)
-
-                self.gym.set_rigid_body_color(
-                    env,
-                    cube,
-                    0,
-                    gymapi.MESH_VISUAL,
-                    gymapi.Vec3(color[0] / 255, color[1] / 255, color[2] / 255),
-                )
-
-                self.actors.append(cube)
-
-            self.envs.append(env)
+        super()._create_envs()
 
     def compute_observations(self):
         for env_id in range(self.num_envs):
