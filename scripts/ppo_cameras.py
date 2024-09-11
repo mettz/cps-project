@@ -29,15 +29,14 @@ class Critic(DeterministicMixin, Model):
         action_space,
         device,
         clip_actions=False,
-        image_resolution=None,
     ):
         Model.__init__(self, observation_space, action_space, device)
         DeterministicMixin.__init__(self, clip_actions)
 
-        self.image_resolution = image_resolution
+        self.drone_states_size = drone_states_size
 
         self.net = nn.Sequential(
-            nn.Linear(drone_states_size, 256),
+            nn.Linear(self.drone_states_size, 256),
             nn.ELU(),
             nn.Linear(256, 256),
             nn.ELU(),
@@ -51,8 +50,8 @@ class Critic(DeterministicMixin, Model):
         # permute (samples, width, height, channels) -> (samples, channels, width, height)
         # (samples x width * height + 13) -> [(samples, 13), (samples, width, height, channels)]
 
-        split_index = self.image_resolution["height"] * self.image_resolution["width"]
-        critic_x = inputs["states"][:, split_index:]
+        # split_index = self.image_resolution["height"] * self.image_resolution["width"]
+        critic_x = inputs["states"][:, -self.drone_states_size :]
 
         return self.net(critic_x), {}
 
@@ -64,6 +63,7 @@ class Actor(GaussianMixin, Model):
         action_space,
         device,
         image_resolution,
+        camera_type="depth",
         clip_actions=False,
         clip_log_std=True,
         min_log_std=-20,
@@ -76,6 +76,7 @@ class Actor(GaussianMixin, Model):
         )
 
         self.image_resolution = image_resolution
+        self.camera_type = camera_type
 
         self.actor_net = nn.Sequential(
             nn.Conv2d(
@@ -171,6 +172,7 @@ def main():
         env.action_space,
         device,
         image_resolution=cfg["env"]["image"]["resolution"],
+        camera_type=cfg["sim"]["camera"],
     )
     # models["value"] = models["policy"]  # same instance: shared model
     models["value"] = Critic(
@@ -179,7 +181,6 @@ def main():
         env.action_space,
         device,
         clip_actions=False,
-        image_resolution=cfg["env"]["image"]["resolution"],
     )
 
     # configure and instantiate the agent (visit its documentation to see all the options)
@@ -241,7 +242,7 @@ def main():
     # trainer.train()
 
     # save the model
-    agent.save("agent_pos_and_vel_reward.pt")
+    # agent.save("agent_pos_and_vel_reward.pt")
 
     # wandb.finish()
 

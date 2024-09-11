@@ -197,8 +197,8 @@ class Quadrotor(VecTask):
             * self.root_linear_velocities[:, 0] ** 2
         )
 
-        self.forces[:, 0] += friction
-        self.forces[:, 0, 2] = common_thrust
+        self.forces[:, 0] = friction
+        self.forces[:, 0, 2] += common_thrust
         self.torques[:, 0] = total_torque
         if self.wandb:
             wandb.log(

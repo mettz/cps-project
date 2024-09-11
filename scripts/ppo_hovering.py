@@ -170,8 +170,8 @@ def main():
     if args.wandb:
         wandb.finish()
 
-    agent.load("ppo_hovering.pt")
-    trainer.eval()
+    # agent.load("ppo_hovering.pt")
+    # trainer.eval()
 
 
 if __name__ == "__main__":

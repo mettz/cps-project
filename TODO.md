@@ -60,3 +60,15 @@ Indice presentazione:
 Totale slides: 14 slides + 2 di video/screenshots
  
 Reminder: dare un'occhiata ai vari post sul gruppo
+
+
+- Sistemare slide PPO
+- Screenshots:
+    - Ambiente con ostacoli e più ambienti - DONE
+    - Grafici wandb reaching target
+    - Primo piano drone con ostacoli - DONE
+    - Immagine visualizzata dal drone - DONE
+- Video:
+    - Drone che si schianta, ambiente che si resetta 
+    - Drone verso palla gialla
+

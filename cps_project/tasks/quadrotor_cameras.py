@@ -7,6 +7,10 @@ from isaacgymenvs.utils.torch_jit_utils import quat_axis
 
 from cps_project.tasks.quadrotor import Quadrotor
 
+import cv2
+import os
+from os import getcwd
+
 # The `Quadrotor` class implements an IsaacGym task with an environment in which a quadrotor
 # tries to avoid obstacles and reach a target using cameras. The task can be used for
 # training reinforcement learning agents e.g. using the `SKRL` RL library.
@@ -30,6 +34,9 @@ class QuadrotorCameras(Quadrotor):
         self.image_cfg = cfg["env"]["image"]
         self.image_res = self.image_cfg["resolution"]
         self.flatten_image_sz = self.image_res["width"] * self.image_res["height"]
+
+        if cfg["sim"]["camera"] != "depth":
+            self.flatten_image_sz *= 4
 
         # Observations: depth camera image flatten + 13 drone states
         num_obs = self.flatten_image_sz + 13
@@ -195,6 +202,7 @@ class QuadrotorCameras(Quadrotor):
                 env_id
             ].view(-1)
             self.obs_buf[env_id, self.flatten_image_sz :] = self.root_states[env_id, 0]
+
         return self.obs_buf
 
 
