@@ -65,10 +65,15 @@ Reminder: dare un'occhiata ai vari post sul gruppo
 - Sistemare slide PPO
 - Screenshots:
     - Ambiente con ostacoli e più ambienti - DONE
-    - Grafici wandb reaching target
+    - Grafici wandb reaching target - DONE
     - Primo piano drone con ostacoli - DONE
     - Immagine visualizzata dal drone - DONE
 - Video:
     - Drone che si schianta, ambiente che si resetta 
-    - Drone verso palla gialla
+    - Drone verso palla gialla - DONE
+
+
+Confronto:
+ - Hovering: 2048 env ~ 10 it/s (max env 16384)
+ - Camera: 8 env ~ 10 it/s with 120 x 67 images. Max env 200 ~ 1 it/s
 

@@ -483,7 +483,7 @@ def compute_quadcopter_reward(
     up_reward = 1.0 / (1.0 + tiltage * tiltage)
 
     # spinning
-    spinnage = torch.norm(root_angvels)
+    spinnage = torch.abs(root_angvels[..., 2])
     spinnage_reward = 1.0 / (1.0 + spinnage * spinnage)
 
     vel = torch.norm(root_linvels, dim=-1)

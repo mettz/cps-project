@@ -8,7 +8,7 @@ from skrl.memories.torch import RandomMemory
 from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
 from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
-from skrl.trainers.torch import SequentialTrainer
+from skrl.trainers.torch import ParallelTrainer
 
 from cps_project.tasks.quadrotor import Quadrotor
 import yaml
@@ -39,13 +39,31 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         )
         DeterministicMixin.__init__(self, clip_actions)
 
+        # self.net = nn.Sequential(
+        #     nn.Linear(self.num_observations, 256),
+        #     nn.ELU(),
+        #     nn.Linear(256, 256),
+        #     nn.ELU(),
+        #     nn.Linear(256, 128),
+        #     nn.ELU(),
+        # )
+
+        # self.mean_layer = nn.Linear(128, self.num_actions)
+        # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+
+        # self.value_layer = nn.Linear(128, 1)
+
         self.net = nn.Sequential(
             nn.Linear(self.num_observations, 256),
-            nn.ELU(),
+            nn.ReLU(),  # Changed to ReLU for simplicity
+            nn.BatchNorm1d(256),  # Added Batch Normalization
             nn.Linear(256, 256),
-            nn.ELU(),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
             nn.Linear(256, 128),
-            nn.ELU(),
+            nn.ReLU(),
+            nn.BatchNorm1d(128),
+            nn.Dropout(0.3),  # Added Dropout
         )
 
         self.mean_layer = nn.Linear(128, self.num_actions)
@@ -84,6 +102,11 @@ def main():
         help="Use Weights & Biases for logging",
         action="store_true",
     )
+    parser.add_argument(
+        "--eval",
+        help="Evaluate the trained agent",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -118,7 +141,8 @@ def main():
     cfg["mini_batches"] = 4
     cfg["discount_factor"] = 0.99
     cfg["lambda"] = 0.95
-    cfg["learning_rate"] = 1e-3
+    # cfg["learning_rate"] = 1e-3
+    cfg["learning_rate"] = 3e-4
     cfg["learning_rate_scheduler"] = KLAdaptiveRL
     cfg["learning_rate_scheduler_kwargs"] = {"kl_threshold": 0.016}
     cfg["random_timesteps"] = 0
@@ -128,7 +152,9 @@ def main():
     cfg["value_clip"] = 0.2
     cfg["clip_predicted_values"] = True
     cfg["entropy_loss_scale"] = 0.0
+
     cfg["value_loss_scale"] = 1.0
+
     cfg["kl_threshold"] = 0
     cfg["rewards_shaper"] = lambda rewards, timestep, timesteps: rewards * 0.1
     cfg["state_preprocessor"] = RunningStandardScaler
@@ -153,7 +179,7 @@ def main():
     )
 
     cfg_trainer = {"timesteps": 8000, "headless": True}
-    trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
+    trainer = ParallelTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
     if args.wandb:
         wandb.init(
@@ -164,14 +190,16 @@ def main():
             },
         )
 
-    trainer.train()
-    agent.save("ppo_hovering.pt")
+    if not args.eval:
+        trainer.train()
+        agent.save("ppo_hovering.pt")
 
     if args.wandb:
         wandb.finish()
 
-    # agent.load("ppo_hovering.pt")
-    # trainer.eval()
+    if args.eval:
+        agent.load("ppo_hovering.pt")
+        trainer.eval()
 
 
 if __name__ == "__main__":

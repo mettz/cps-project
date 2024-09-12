@@ -7,10 +7,6 @@ from isaacgymenvs.utils.torch_jit_utils import quat_axis
 
 from cps_project.tasks.quadrotor import Quadrotor
 
-import cv2
-import os
-from os import getcwd
-
 # The `Quadrotor` class implements an IsaacGym task with an environment in which a quadrotor
 # tries to avoid obstacles and reach a target using cameras. The task can be used for
 # training reinforcement learning agents e.g. using the `SKRL` RL library.
@@ -30,6 +26,7 @@ class QuadrotorCameras(Quadrotor):
         headless,
         virtual_screen_capture,
         force_render,
+        wandb=False,
     ):
         self.image_cfg = cfg["env"]["image"]
         self.image_res = self.image_cfg["resolution"]
@@ -49,10 +46,8 @@ class QuadrotorCameras(Quadrotor):
             virtual_screen_capture=virtual_screen_capture,
             force_render=force_render,
             num_obs=num_obs,
+            wandb=wandb,
         )
-
-        print(f"numObservations: {self.cfg['env']['numObservations']}")
-        print(f"numActions: {self.cfg['env']['numActions']}")
 
         self.compute_quadcopter_reward_fn = compute_quadcopter_cameras_reward
 
@@ -84,16 +79,7 @@ class QuadrotorCameras(Quadrotor):
     def reset_idx(self, env_ids):
         super().reset_idx(env_ids)
 
-        positions = torch.rand(
-            len(env_ids), self.cfg["env"]["numObstacles"], 3, device=self.device
-        )
-        # print("randomizing positions of obstacles")
-
-        positions[:, :, 0] = positions[:, :, 0] * 10 - 5
-        positions[:, :, 1] = positions[:, :, 1] * 5
-        positions[:, :, 2] = positions[:, :, 2] * 5
-
-        self.root_states[env_ids, 6:, 0:3] = positions
+        # self.root_states[env_ids, 6:, 0:3] = positions
 
     def dump_images(self):
         for env_id in range(self.num_envs):
@@ -168,11 +154,24 @@ class QuadrotorCameras(Quadrotor):
 
         self.cameras.append(cam)
 
+        obs_pos = torch.rand(
+            len(self.envs), self.cfg["env"]["numObstacles"], 3, device=self.device
+        )
+        obs_pos[:, :, 0] = obs_pos[:, :, 0] * 7 - 3
+        obs_pos[:, :, 1] = obs_pos[:, :, 1] * 3 + 1
+        obs_pos[:, :, 2] = obs_pos[:, :, 2] * 3 + 1
+
         for j in range(self.cfg["env"]["numObstacles"]):
             cube = self.gym.create_actor(
                 self.envs[env_id],
                 self.cube_asset,
-                gymapi.Transform(p=gymapi.Vec3(0, 0, 0)),
+                gymapi.Transform(
+                    p=gymapi.Vec3(
+                        obs_pos[env_id, j, 0],
+                        obs_pos[env_id, j, 1],
+                        obs_pos[env_id, j, 2],
+                    )
+                ),
                 f"cube{j}",
                 env_id,
                 0,
@@ -232,7 +231,7 @@ def compute_quadcopter_cameras_reward(
     up_reward = 1.0 / (1.0 + tiltage * tiltage)
 
     # spinning
-    spinnage = torch.norm(root_angvels)
+    spinnage = torch.abs(root_angvels[..., 2])
     spinnage_reward = 1.0 / (1.0 + spinnage * spinnage)
 
     vel = torch.norm(root_linvels, dim=-1)
