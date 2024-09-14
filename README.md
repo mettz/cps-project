@@ -138,7 +138,7 @@ Here we have collected and categorized various resources that have been useful d
 Links:
 - [CNN with MNIST 1](https://pyimagesearch.com/2021/07/19/pytorch-training-your-first-convolutional-neural-network-cnn/)
 - [CNN with MNIST 2](https://www.kaggle.com/code/sdelecourt/cnn-with-pytorch-for-mnist)
-- [CNN with MNIST 3](https://medium.com/@nutanbhogendrasharma/pytorch-convolutional-neural-network-with-mnist-dataset-4e8a4265e118): the example code of this can be found under the `resources/mnist` folder.
+- [CNN with MNIST 3](https://medium.com/@nutanbhogendrasharma/pytorch-convolutional-neural-network-with-mnist-dataset-4e8a4265e118)
 - [CNN theory](https://cs231n.github.io/convolutional-networks/)
 
 Books:
