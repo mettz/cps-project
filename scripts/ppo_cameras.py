@@ -2,7 +2,6 @@ import isaacgym
 import torch
 import torch.nn as nn
 
-# import the skrl components to build the RL system
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
 from skrl.envs.wrappers.torch import wrap_env
 from skrl.memories.torch import RandomMemory
@@ -118,7 +117,7 @@ class Actor(GaussianMixin, Model):
         if self.camera_type != "depth":
             split_index *= 4
 
-        image_tensor = inputs["states"][:, 0:split_index]  # 4
+        image_tensor = inputs["states"][:, 0:split_index]
 
         if self.camera_type == "depth":
             actor_x = image_tensor.view(
@@ -223,7 +222,6 @@ def main():
     cfg["state_preprocessor_kwargs"] = {"size": env.observation_space, "device": device}
     cfg["value_preprocessor"] = RunningStandardScaler
     cfg["value_preprocessor_kwargs"] = {"size": 1, "device": device}
-    # logging to TensorBoard and write checkpoints (in timesteps)
     cfg["experiment"]["write_interval"] = 20
     cfg["experiment"]["checkpoint_interval"] = 200
     cfg["experiment"]["directory"] = "runs/torch/Quadcopter"

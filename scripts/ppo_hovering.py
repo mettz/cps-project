@@ -39,31 +39,17 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         )
         DeterministicMixin.__init__(self, clip_actions)
 
-        # self.net = nn.Sequential(
-        #     nn.Linear(self.num_observations, 256),
-        #     nn.ELU(),
-        #     nn.Linear(256, 256),
-        #     nn.ELU(),
-        #     nn.Linear(256, 128),
-        #     nn.ELU(),
-        # )
-
-        # self.mean_layer = nn.Linear(128, self.num_actions)
-        # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-
-        # self.value_layer = nn.Linear(128, 1)
-
         self.net = nn.Sequential(
             nn.Linear(self.num_observations, 256),
             nn.ReLU(),  # Changed to ReLU for simplicity
-            nn.BatchNorm1d(256),  # Added Batch Normalization
+            nn.BatchNorm1d(256),
             nn.Linear(256, 256),
             nn.ReLU(),
             nn.BatchNorm1d(256),
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.BatchNorm1d(128),
-            nn.Dropout(0.3),  # Added Dropout
+            nn.Dropout(0.3),
         )
 
         self.mean_layer = nn.Linear(128, self.num_actions)
@@ -141,7 +127,6 @@ def main():
     cfg["mini_batches"] = 4
     cfg["discount_factor"] = 0.99
     cfg["lambda"] = 0.95
-    # cfg["learning_rate"] = 1e-3
     cfg["learning_rate"] = 3e-4
     cfg["learning_rate_scheduler"] = KLAdaptiveRL
     cfg["learning_rate_scheduler_kwargs"] = {"kl_threshold": 0.016}
@@ -161,7 +146,6 @@ def main():
     cfg["state_preprocessor_kwargs"] = {"size": env.observation_space, "device": device}
     cfg["value_preprocessor"] = RunningStandardScaler
     cfg["value_preprocessor_kwargs"] = {"size": 1, "device": device}
-    # logging to TensorBoard and write checkpoints (in timesteps)
     cfg["experiment"]["write_interval"] = 20
     cfg["experiment"]["checkpoint_interval"] = 200
     cfg["experiment"]["directory"] = "runs/torch/Quadcopter"
