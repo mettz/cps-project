@@ -79,8 +79,6 @@ class QuadrotorCameras(Quadrotor):
     def reset_idx(self, env_ids):
         super().reset_idx(env_ids)
 
-        # self.root_states[env_ids, 6:, 0:3] = positions
-
     def dump_images(self):
         for env_id in range(self.num_envs):
             # the depth values are in -ve z axis, so we need to flip it to positive
